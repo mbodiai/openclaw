@@ -52,7 +52,6 @@ describe("persistSessionUsageUpdate – heartbeat model isolation (#21524)", () 
     const store = loadSessionStore(storePath);
     const cfg: OpenClawConfig = {
       agents: { defaults: {} },
-      model: { primary: "anthropic/claude-sonnet-4.6" },
     };
     const result = listSessionsFromStore({
       cfg,
