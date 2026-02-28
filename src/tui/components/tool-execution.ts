@@ -108,6 +108,18 @@ function extractText(result?: ToolResult): string {
   return lines.join("\n").trim();
 }
 
+function formatReadWithLineNumbers(text: string, args: unknown): string | null {
+  if (!text) {
+    return null;
+  }
+  const a = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+  const startLine = Number(a.offset ?? a.from ?? a.line ?? 1) || 1;
+  const lines = text.split("\n");
+  const gutterWidth = String(startLine + lines.length - 1).length;
+  const pad = (n: number) => String(n).padStart(gutterWidth);
+  return lines.map((line, i) => `${chalk.dim(`${pad(startLine + i)}│`)}${line}`).join("\n");
+}
+
 function formatEditDiff(args: unknown): string | null {
   if (!args || typeof args !== "object") {
     return null;
@@ -233,8 +245,10 @@ export class ToolExecutionComponent extends Container {
 
     // For edit tools, show a diff of old → new text.
     const isEditTool = this.toolName === "edit" || this.toolName === "str_replace_editor";
+    const isReadTool = this.toolName === "read";
     const diff = isEditTool ? formatEditDiff(this.args) : null;
-    const text = diff ?? raw ?? (this.isPartial ? "…" : "");
+    const numbered = isReadTool && raw ? formatReadWithLineNumbers(raw, this.args) : null;
+    const text = diff ?? numbered ?? raw ?? (this.isPartial ? "…" : "");
     if (!this.expanded && text) {
       const lines = text.split("\n");
       const limit = diff ? PREVIEW_LINES * 2 : PREVIEW_LINES;
