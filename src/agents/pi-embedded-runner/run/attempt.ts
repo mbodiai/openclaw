@@ -1829,6 +1829,7 @@ export async function runEmbeddedAttempt(
               runId: params.runId,
               loopDetection: clientToolLoopDetection,
             },
+            { abortSignal: runAbortController.signal },
           )
         : [];
 
