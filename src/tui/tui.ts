@@ -17,6 +17,7 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { getSlashCommands } from "./commands.js";
+import { setThinkingExpandedView } from "./components/assistant-message.js";
 import { ChatLog } from "./components/chat-log.js";
 import { CustomEditor } from "./components/custom-editor.js";
 import { GatewayChatClient } from "./gateway-chat.js";
@@ -290,7 +291,7 @@ export async function runTui(opts: TuiOptions) {
   let isConnected = false;
   let wasDisconnected = false;
   let toolsExpanded = false;
-  let showThinking = false;
+  let showThinking = true;
   let pairingHintShown = false;
   const localRunIds = new Set<string>();
 
@@ -302,6 +303,10 @@ export async function runTui(opts: TuiOptions) {
   let exitRequested = false;
   let activityStatus = "idle";
   let connectionStatus = "connecting";
+  let liveThinkingPreview = "";
+  let activeToolName = "";
+  let thinkingExpanded = false;
+  let thinkingPreviewDebounceTimer: NodeJS.Timeout | null = null;
   let statusTimeout: NodeJS.Timeout | null = null;
   let statusTimer: NodeJS.Timeout | null = null;
   let statusStartedAt: number | null = null;
@@ -568,6 +573,44 @@ export async function runTui(opts: TuiOptions) {
   let waitingTimer: NodeJS.Timeout | null = null;
   let waitingPhrase: string | null = null;
 
+  const statusWithContext = (base: string) => {
+    const parts = [base];
+    if (activeToolName) {
+      parts.push(`tool: ${activeToolName}`);
+    }
+    const preview = liveThinkingPreview.trim();
+    if (preview) {
+      parts.push(`thinking ... ${preview}`);
+    }
+    return parts.join(" | ");
+  };
+
+  const setThinkingPreview = (text: string) => {
+    if (thinkingPreviewDebounceTimer) {
+      clearTimeout(thinkingPreviewDebounceTimer);
+    }
+    const next = text;
+    thinkingPreviewDebounceTimer = setTimeout(() => {
+      liveThinkingPreview = next;
+      if (busyStates.has(activityStatus)) {
+        updateBusyStatusMessage();
+      }
+    }, 250);
+  };
+
+  const setActiveToolName = (toolName: string) => {
+    activeToolName = toolName;
+    if (busyStates.has(activityStatus)) {
+      updateBusyStatusMessage();
+    }
+  };
+
+  const setThinkingExpanded = (value: boolean) => {
+    thinkingExpanded = value;
+    setThinkingExpandedView(value);
+  };
+  setThinkingExpanded(false);
+
   const updateBusyStatusMessage = () => {
     if (!statusLoader || !statusStartedAt) {
       return;
@@ -576,19 +619,18 @@ export async function runTui(opts: TuiOptions) {
 
     if (activityStatus === "waiting") {
       waitingTick++;
-      statusLoader.setMessage(
-        buildWaitingStatusMessage({
-          theme,
-          tick: waitingTick,
-          elapsed,
-          connectionStatus,
-          phrases: waitingPhrase ? [waitingPhrase] : undefined,
-        }),
-      );
+      const waiting = buildWaitingStatusMessage({
+        theme,
+        tick: waitingTick,
+        elapsed,
+        connectionStatus,
+        phrases: waitingPhrase ? [waitingPhrase] : undefined,
+      });
+      statusLoader.setMessage(statusWithContext(waiting));
       return;
     }
 
-    statusLoader.setMessage(`${activityStatus} • ${elapsed} | ${connectionStatus}`);
+    statusLoader.setMessage(statusWithContext(`${activityStatus} • ${elapsed} | ${connectionStatus}`));
   };
 
   const startStatusTimer = () => {
@@ -804,6 +846,8 @@ export async function runTui(opts: TuiOptions) {
     onRunSettled: () => {
       void flushQueuedMessage();
     },
+    setThinkingPreview,
+    setActiveToolName,
   });
 
   const { runLocalShellLine } = createLocalShellRunner({
@@ -871,6 +915,13 @@ export async function runTui(opts: TuiOptions) {
   };
   editor.onCtrlT = () => {
     showThinking = !showThinking;
+    void loadHistory();
+  };
+
+  editor.onCtrlY = () => {
+    const next = !thinkingExpanded;
+    setThinkingExpanded(next);
+    setActivityStatus(next ? "thinking expanded" : "thinking compact");
     void loadHistory();
   };
 
