@@ -242,6 +242,86 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     tui.requestRender();
   };
 
+  const queuedMessages: string[] = [];
+
+  const sendMessageNow = async (text: string, options?: { addToChatLog?: boolean }) => {
+    if (!state.isConnected) {
+      chatLog.addSystem("not connected to gateway — message not sent");
+      setActivityStatus("disconnected");
+      tui.requestRender();
+      return;
+    }
+    const isBtw = isBtwCommand(text);
+    const runId = randomUUID();
+    try {
+      if (options?.addToChatLog !== false) {
+        chatLog.addUser(text);
+      }
+      tui.requestRender();
+      if (!isBtw) {
+        noteLocalRunId(runId);
+        state.activeChatRunId = runId;
+        setActivityStatus("sending");
+      } else {
+        noteLocalBtwRunId?.(runId);
+      }
+      tui.requestRender();
+      await client.sendChat({
+        sessionKey: state.currentSessionKey,
+        message: text,
+        thinking: opts.thinking,
+        deliver: deliverDefault,
+        timeoutMs: opts.timeoutMs,
+        runId,
+      });
+      if (!isBtw) {
+        setActivityStatus("waiting");
+      }
+    } catch (err) {
+      if (isBtw) {
+        forgetLocalBtwRunId?.(runId);
+      }
+      if (!isBtw && state.activeChatRunId) {
+        forgetLocalRunId?.(state.activeChatRunId);
+      }
+      if (!isBtw) {
+        state.activeChatRunId = null;
+      }
+      chatLog.addSystem(`${isBtw ? "btw failed" : "send failed"}: ${String(err)}`);
+      if (!isBtw) {
+        setActivityStatus("error");
+      }
+    }
+    tui.requestRender();
+  };
+
+  const sendMessage = async (text: string) => {
+    if (state.activeChatRunId && !isBtwCommand(text)) {
+      queuedMessages.push(text);
+      chatLog.addUser(text);
+      chatLog.addSystem(`queued (${queuedMessages.length})`);
+      tui.requestRender();
+      return;
+    }
+    await sendMessageNow(text);
+  };
+
+  const flushQueuedMessage = async (): Promise<boolean> => {
+    if (state.activeChatRunId) {
+      return false;
+    }
+    const next = queuedMessages.shift();
+    if (!next) {
+      return false;
+    }
+    const remaining = queuedMessages.length;
+    if (remaining > 0) {
+      chatLog.addSystem(`sending queued message (${remaining} left)`);
+    }
+    await sendMessageNow(next, { addToChatLog: false });
+    return true;
+  };
+
   const handleCommand = async (raw: string) => {
     const { name, args } = parseCommand(raw);
     if (!name) {
@@ -507,59 +587,10 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     }
     tui.requestRender();
   };
-
-  const sendMessage = async (text: string) => {
-    if (!state.isConnected) {
-      chatLog.addSystem("not connected to gateway — message not sent");
-      setActivityStatus("disconnected");
-      tui.requestRender();
-      return;
-    }
-    const isBtw = isBtwCommand(text);
-    const runId = randomUUID();
-    try {
-      if (!isBtw) {
-        chatLog.addUser(text);
-        noteLocalRunId(runId);
-        state.activeChatRunId = runId;
-        setActivityStatus("sending");
-      } else {
-        noteLocalBtwRunId?.(runId);
-      }
-      tui.requestRender();
-      await client.sendChat({
-        sessionKey: state.currentSessionKey,
-        message: text,
-        thinking: opts.thinking,
-        deliver: deliverDefault,
-        timeoutMs: opts.timeoutMs,
-        runId,
-      });
-      if (!isBtw) {
-        setActivityStatus("waiting");
-        tui.requestRender();
-      }
-    } catch (err) {
-      if (isBtw) {
-        forgetLocalBtwRunId?.(runId);
-      }
-      if (!isBtw && state.activeChatRunId) {
-        forgetLocalRunId?.(state.activeChatRunId);
-      }
-      if (!isBtw) {
-        state.activeChatRunId = null;
-      }
-      chatLog.addSystem(`${isBtw ? "btw failed" : "send failed"}: ${String(err)}`);
-      if (!isBtw) {
-        setActivityStatus("error");
-      }
-      tui.requestRender();
-    }
-  };
-
   return {
     handleCommand,
     sendMessage,
+    flushQueuedMessage,
     openModelSelector,
     openAgentSelector,
     openSessionSelector,

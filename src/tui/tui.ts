@@ -838,6 +838,47 @@ export async function runTui(opts: TuiOptions) {
     abortActive,
   } = sessionActions;
 
+  const requestExit = () => {
+    if (exitRequested) {
+      return;
+    }
+    exitRequested = true;
+    client.stop();
+    stopTuiSafely(() => tui.stop());
+    process.exit(0);
+  };
+
+  const {
+    handleCommand,
+    sendMessage,
+    flushQueuedMessage,
+    openModelSelector,
+    openAgentSelector,
+    openSessionSelector,
+  } = createCommandHandlers({
+    client,
+    chatLog,
+    tui,
+    opts,
+    state,
+    deliverDefault,
+    openOverlay,
+    closeOverlay,
+    refreshSessionInfo,
+    applySessionInfoFromPatch,
+    loadHistory,
+    setSession,
+    refreshAgents,
+    abortActive,
+    setActivityStatus,
+    formatSessionKey,
+    noteLocalRunId,
+    noteLocalBtwRunId,
+    forgetLocalRunId,
+    forgetLocalBtwRunId,
+    requestExit,
+  });
+
   const { handleChatEvent, handleAgentEvent, handleBtwEvent } = createEventHandlers({
     chatLog,
     btw,
@@ -852,42 +893,10 @@ export async function runTui(opts: TuiOptions) {
     isLocalBtwRunId,
     forgetLocalBtwRunId,
     clearLocalBtwRunIds,
+    onRunSettled: () => {
+      void flushQueuedMessage();
+    },
   });
-
-  const requestExit = () => {
-    if (exitRequested) {
-      return;
-    }
-    exitRequested = true;
-    client.stop();
-    stopTuiSafely(() => tui.stop());
-    process.exit(0);
-  };
-
-  const { handleCommand, sendMessage, openModelSelector, openAgentSelector, openSessionSelector } =
-    createCommandHandlers({
-      client,
-      chatLog,
-      tui,
-      opts,
-      state,
-      deliverDefault,
-      openOverlay,
-      closeOverlay,
-      refreshSessionInfo,
-      applySessionInfoFromPatch,
-      loadHistory,
-      setSession,
-      refreshAgents,
-      abortActive,
-      setActivityStatus,
-      formatSessionKey,
-      noteLocalRunId,
-      noteLocalBtwRunId,
-      forgetLocalRunId,
-      forgetLocalBtwRunId,
-      requestExit,
-    });
 
   const { runLocalShellLine } = createLocalShellRunner({
     chatLog,

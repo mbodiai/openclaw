@@ -39,6 +39,7 @@ type EventHandlerContext = {
   isLocalBtwRunId?: (runId: string) => boolean;
   forgetLocalBtwRunId?: (runId: string) => void;
   clearLocalBtwRunIds?: () => void;
+  onRunSettled?: (runId: string) => void;
 };
 
 export function createEventHandlers(context: EventHandlerContext) {
@@ -56,6 +57,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     isLocalBtwRunId,
     forgetLocalBtwRunId,
     clearLocalBtwRunIds,
+    onRunSettled,
   } = context;
   const finalizedRuns = new Map<string, number>();
   const sessionRuns = new Map<string, number>();
@@ -125,6 +127,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     clearActiveRunIfMatch(params.runId);
     if (params.wasActiveRun) {
       setActivityStatus(params.status);
+      onRunSettled?.(params.runId);
     }
     void refreshSessionInfo?.();
   };
@@ -139,6 +142,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     clearActiveRunIfMatch(params.runId);
     if (params.wasActiveRun) {
       setActivityStatus(params.status);
+      onRunSettled?.(params.runId);
     }
     void refreshSessionInfo?.();
   };
