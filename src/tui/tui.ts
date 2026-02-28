@@ -356,7 +356,7 @@ export async function runTui(opts: TuiOptions) {
   let connectionStatus = "connecting";
   let liveThinkingPreview = "";
   let activeToolName = "";
-  let thinkingExpanded = false;
+  let thinkingExpanded = true;
   let thinkingPreviewDebounceTimer: NodeJS.Timeout | null = null;
   let statusTimeout: NodeJS.Timeout | null = null;
   let statusTimer: NodeJS.Timeout | null = null;
