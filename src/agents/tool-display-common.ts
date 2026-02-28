@@ -1036,15 +1036,11 @@ function isGenericSummary(summary: string): boolean {
 }
 
 /** Compact the raw command for display: collapse whitespace, trim long strings. */
-function compactRawCommand(raw: string, maxLength = 1000): string {
-  const oneLine = raw
+function compactRawCommand(raw: string): string {
+  return raw
     .replace(/\s*\n\s*/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
-  if (oneLine.length <= maxLength) {
-    return oneLine;
-  }
-  return `${oneLine.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
 export function resolveExecDetail(args: unknown): string | undefined {
