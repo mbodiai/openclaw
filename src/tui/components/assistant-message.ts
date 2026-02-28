@@ -50,7 +50,7 @@ function compactThinkingForUi(text: string, maxLen = 300) {
   return `…${normalized.slice(-(maxLen - 1))}`;
 }
 
-let thinkingExpandedView = false;
+let thinkingExpandedView = true;
 export function setThinkingExpandedView(value: boolean) {
   thinkingExpandedView = value;
 }
