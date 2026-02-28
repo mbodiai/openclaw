@@ -184,7 +184,7 @@ export class ToolExecutionComponent extends Container {
   private toolName: string;
   private args: unknown;
   private result?: ToolResult;
-  private expanded = false;
+  private expanded = true;
   private isError = false;
   private isPartial = true;
   private updateCount = 0;
