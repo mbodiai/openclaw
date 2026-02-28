@@ -120,7 +120,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`model set to ${value}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`model set failed: ${String(err)}`);
         }
@@ -363,7 +362,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
             });
             chatLog.addSystem(`model set to ${args}`);
             applySessionInfoFromPatch(result);
-            await refreshSessionInfo();
           } catch (err) {
             chatLog.addSystem(`model set failed: ${String(err)}`);
           }
@@ -389,7 +387,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`thinking set to ${args}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`think failed: ${String(err)}`);
         }
@@ -428,7 +425,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`reasoning set to ${normalized}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`reasoning failed: ${String(err)}`);
         }
@@ -450,7 +446,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`usage footer: ${next}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`usage failed: ${String(err)}`);
         }
@@ -472,7 +467,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`elevated set to ${args}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`elevated failed: ${String(err)}`);
         }
@@ -489,7 +483,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`activation set to ${args}`);
           applySessionInfoFromPatch(result);
-          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`activation failed: ${String(err)}`);
         }
