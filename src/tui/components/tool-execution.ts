@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import chalk from "chalk";
 import { Box, Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { formatToolDetail, resolveToolDisplay } from "../../agents/tool-display.js";
@@ -131,18 +132,46 @@ function formatEditDiff(args: unknown): string | null {
     return null;
   }
   const filePath = (a.file_path ?? a.path ?? a.filePath ?? "") as string;
+
+  // Try to find real line number by searching for the NEW text in the file
+  // (old text is gone post-edit, but new text should be at the same location).
+  let startLine = 0;
+  if (filePath && newText) {
+    try {
+      const resolvedPath = filePath.replace(/^~/, process.env.HOME ?? "~");
+      const content = fs.readFileSync(resolvedPath, "utf-8");
+      const firstNewLine = newText.split("\n")[0]?.trim();
+      if (firstNewLine) {
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim() === firstNewLine) {
+            startLine = i + 1;
+            break;
+          }
+        }
+      }
+    } catch {
+      // File not readable — skip line numbers
+    }
+  }
+
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
+  const maxLine = startLine + Math.max(oldLines.length, newLines.length) - 1;
+  const gutterWidth = startLine > 0 ? String(maxLine).length : 0;
+  const pad = (n: number) => String(n).padStart(gutterWidth);
+  const gutter = (n: number) => startLine > 0 ? chalk.dim(`${pad(n)}│`) : "";
+
   const parts: string[] = [];
   if (filePath) {
     parts.push(chalk.bold.white(`--- ${filePath}`));
     parts.push(chalk.bold.white(`+++ ${filePath}`));
   }
-  for (const line of oldLines) {
-    parts.push(chalk.bgRgb(80, 20, 20).redBright(`- ${line}`));
+  for (let i = 0; i < oldLines.length; i++) {
+    parts.push(`${gutter(startLine + i)}${chalk.bgRgb(80, 20, 20).redBright(`- ${oldLines[i]}`)}`);
   }
-  for (const line of newLines) {
-    parts.push(chalk.bgRgb(20, 60, 20).greenBright(`+ ${line}`));
+  for (let i = 0; i < newLines.length; i++) {
+    parts.push(`${gutter(startLine + i)}${chalk.bgRgb(20, 60, 20).greenBright(`+ ${newLines[i]}`)}`);
   }
   return parts.join("\n");
 }
