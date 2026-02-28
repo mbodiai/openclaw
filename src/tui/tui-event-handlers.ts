@@ -75,6 +75,22 @@ export function createEventHandlers(context: EventHandlerContext) {
   let streamAssembler = new TuiStreamAssembler();
   let lastSessionKey = state.currentSessionKey;
 
+  // Buffer agent events that arrive before session info is loaded.
+  // Once session info is available (historyLoaded = true), replay and
+  // process future events with the real verbose level.
+  let pendingAgentEvents: unknown[] | null = [];
+  const drainPendingAgentEvents = () => {
+    if (!pendingAgentEvents || pendingAgentEvents.length === 0) {
+      pendingAgentEvents = null;
+      return;
+    }
+    const events = pendingAgentEvents;
+    pendingAgentEvents = null;
+    for (const evt of events) {
+      handleAgentEvent(evt);
+    }
+  };
+
   const pruneRunMap = (runs: Map<string, number>) => {
     if (runs.size <= 200) {
       return;
@@ -322,6 +338,13 @@ export function createEventHandlers(context: EventHandlerContext) {
     if (!payload || typeof payload !== "object") {
       return;
     }
+    // Buffer agent events until session info is loaded so we have the
+    // real verbose level. Chat events (deltas, final) are not buffered
+    // because they don't depend on verbose level.
+    if (pendingAgentEvents !== null && !state.historyLoaded) {
+      pendingAgentEvents.push(payload);
+      return;
+    }
     const evt = payload as AgentEvent;
     syncSessionKey();
     // Agent events (tool streaming, lifecycle) are emitted per-run. Filter against the
@@ -420,5 +443,15 @@ export function createEventHandlers(context: EventHandlerContext) {
     tui.requestRender();
   };
 
-  return { handleChatEvent, handleAgentEvent, handleBtwEvent };
+  const resetAgentEventBuffer = () => {
+    pendingAgentEvents = [];
+  };
+
+  return {
+    handleChatEvent,
+    handleAgentEvent,
+    handleBtwEvent,
+    drainPendingAgentEvents,
+    resetAgentEventBuffer,
+  };
 }

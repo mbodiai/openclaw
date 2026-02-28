@@ -865,6 +865,10 @@ export async function runTui(opts: TuiOptions) {
     return parsed ? normalizeAgentId(parsed.agentId) : null;
   })();
 
+  // Late-binding reference for draining buffered agent events after history loads.
+  // Set after event handlers are created (they depend on session actions).
+  let drainPendingAgentEventsFn: (() => void) | null = null;
+
   const sessionActions = createSessionActions({
     client,
     chatLog,
@@ -881,6 +885,9 @@ export async function runTui(opts: TuiOptions) {
     updateAutocompleteProvider,
     setActivityStatus,
     clearLocalRunIds,
+    onHistoryLoaded: () => {
+      drainPendingAgentEventsFn?.();
+    },
   });
   const {
     refreshAgents,
@@ -933,7 +940,8 @@ export async function runTui(opts: TuiOptions) {
     requestExit,
   });
 
-  const { handleChatEvent, handleAgentEvent, handleBtwEvent } = createEventHandlers({
+  const { handleChatEvent, handleAgentEvent, handleBtwEvent, drainPendingAgentEvents, resetAgentEventBuffer } =
+    createEventHandlers({
     chatLog,
     btw,
     tui,
@@ -952,7 +960,10 @@ export async function runTui(opts: TuiOptions) {
     },
     setThinkingPreview,
     setActiveToolName,
-  });
+    });
+
+  // Wire the late-binding drain reference now that event handlers exist.
+  drainPendingAgentEventsFn = drainPendingAgentEvents;
 
   const { runLocalShellLine } = createLocalShellRunner({
     chatLog,
@@ -1077,7 +1088,7 @@ export async function runTui(opts: TuiOptions) {
     void (async () => {
       await refreshAgents();
       updateHeader();
-      await loadHistory();
+      await loadHistory(); // triggers onHistoryLoaded → drainPendingAgentEvents
       setConnectionStatus(reconnected ? "gateway reconnected" : "gateway connected", 4000);
       tui.requestRender();
       if (!autoMessageSent && autoMessage) {
@@ -1093,6 +1104,7 @@ export async function runTui(opts: TuiOptions) {
     isConnected = false;
     wasDisconnected = true;
     historyLoaded = false;
+    resetAgentEventBuffer();
     const disconnectState = resolveGatewayDisconnectState(reason);
     setConnectionStatus(disconnectState.connectionStatus, 5000);
     setActivityStatus(disconnectState.activityStatus);
