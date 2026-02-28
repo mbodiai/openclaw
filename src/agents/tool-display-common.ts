@@ -1036,7 +1036,7 @@ function isGenericSummary(summary: string): boolean {
 }
 
 /** Compact the raw command for display: collapse whitespace, trim long strings. */
-function compactRawCommand(raw: string, maxLength = 120): string {
+function compactRawCommand(raw: string, maxLength = 1000): string {
   const oneLine = raw
     .replace(/\s*\n\s*/g, " ")
     .replace(/\s{2,}/g, " ")
