@@ -55,6 +55,11 @@ export function setThinkingExpandedView(value: boolean) {
   thinkingExpandedView = value;
 }
 
+let verboseFullMode = false;
+export function setVerboseFullMode(value: boolean) {
+  verboseFullMode = value;
+}
+
 export class AssistantMessageComponent extends Container {
   private thinking: Text;
   private body: HyperlinkMarkdown;
@@ -77,7 +82,8 @@ export class AssistantMessageComponent extends Container {
     const { thinking, content } = splitThinkingPrefix(text);
     if (thinking) {
       const normalized = normalizeThinkingForUi(thinking);
-      const shown = thinkingExpandedView ? normalized : compactThinkingForUi(normalized);
+      const expanded = thinkingExpandedView || verboseFullMode;
+      const shown = expanded ? normalized : compactThinkingForUi(normalized);
       this.thinking.setText(theme.dim(theme.italic(`thinking ... ${shown || normalized}`)));
     } else {
       this.thinking.setText("");
