@@ -45,6 +45,8 @@ type EventHandlerContext = {
   forgetLocalBtwRunId?: (runId: string) => void;
   clearLocalBtwRunIds?: () => void;
   onRunSettled?: (runId: string) => void;
+  setThinkingPreview?: (text: string) => void;
+  setActiveToolName?: (toolName: string) => void;
 };
 
 export function createEventHandlers(context: EventHandlerContext) {
@@ -63,6 +65,8 @@ export function createEventHandlers(context: EventHandlerContext) {
     forgetLocalBtwRunId,
     clearLocalBtwRunIds,
     onRunSettled,
+    setThinkingPreview,
+    setActiveToolName,
   } = context;
   const LOCAL_NO_OUTPUT_HISTORY_FALLBACK_DELAYS_MS = [200, 1000];
   const finalizedRuns = new Map<string, number>();
@@ -236,6 +240,7 @@ export function createEventHandlers(context: EventHandlerContext) {
       }
       chatLog.updateAssistant(displayText, evt.runId);
       setActivityStatus("streaming");
+      tui.requestRender();
     }
     if (evt.state === "final") {
       const isLocalBtwRun = isLocalBtwRunId?.(evt.runId) ?? false;
@@ -343,6 +348,7 @@ export function createEventHandlers(context: EventHandlerContext) {
       }
       if (phase === "start") {
         chatLog.startTool(toolCallId, toolName, data.args);
+        setActiveToolName?.(toolName);
       } else if (phase === "update") {
         if (!allowToolOutput) {
           return;
@@ -360,6 +366,13 @@ export function createEventHandlers(context: EventHandlerContext) {
         }
       }
       tui.requestRender();
+      return;
+    }
+    if (evt.stream === "thinking") {
+      const text = typeof evt.data?.text === "string" ? evt.data.text : "";
+      if (text) {
+        setThinkingPreview?.(text);
+      }
       return;
     }
     if (evt.stream === "lifecycle") {
