@@ -25,17 +25,29 @@ function normalizeThinkingForUi(text: string) {
   return text.replace(/\*\*/g, "").replace(/^\s*\*\s*/gm, "").replace(/\s+/g, " ").trim();
 }
 
-function compactThinkingForUi(text: string) {
+function compactThinkingForUi(text: string, maxLen = 300) {
   const normalized = normalizeThinkingForUi(text);
   if (!normalized) {
     return "";
   }
-  const parts = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const lastSentence = parts.length > 0 ? parts[parts.length - 1] : normalized;
-  if (lastSentence.length <= 88) {
-    return lastSentence;
+  if (normalized.length <= maxLen) {
+    return normalized;
   }
-  return `${lastSentence.slice(0, 87)}…`;
+  // Show the last portion that fits within maxLen, preferring sentence boundaries.
+  const parts = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
+  let result = "";
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const candidate = parts.slice(i).join(" ");
+    if (candidate.length <= maxLen) {
+      result = candidate;
+    } else {
+      break;
+    }
+  }
+  if (result) {
+    return result;
+  }
+  return `…${normalized.slice(-(maxLen - 1))}`;
 }
 
 let thinkingExpandedView = false;
