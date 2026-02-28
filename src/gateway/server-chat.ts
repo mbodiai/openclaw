@@ -203,6 +203,14 @@ export type ChatRunState = {
   /** Length of text at the time of the last broadcast, used to avoid duplicate flushes. */
   deltaLastBroadcastLen: Map<string, number>;
   abortedRuns: Map<string, number>;
+  /** Text from prior assistant messages within the same run, accumulated at message boundaries. */
+  priorSegments: Map<string, string>;
+  /**
+   * Last raw (pre-strip) text seen per run — used for message-boundary detection.
+   * A new assistant message is detected when the new raw text is non-empty and
+   * does not start with the previous raw text.
+   */
+  rawBuffers: Map<string, string>;
   clear: () => void;
 };
 
@@ -212,6 +220,8 @@ export function createChatRunState(): ChatRunState {
   const deltaSentAt = new Map<string, number>();
   const deltaLastBroadcastLen = new Map<string, number>();
   const abortedRuns = new Map<string, number>();
+  const priorSegments = new Map<string, string>();
+  const rawBuffers = new Map<string, string>();
 
   const clear = () => {
     registry.clear();
@@ -219,6 +229,8 @@ export function createChatRunState(): ChatRunState {
     deltaSentAt.clear();
     deltaLastBroadcastLen.clear();
     abortedRuns.clear();
+    priorSegments.clear();
+    rawBuffers.clear();
   };
 
   return {
@@ -227,6 +239,8 @@ export function createChatRunState(): ChatRunState {
     deltaSentAt,
     deltaLastBroadcastLen,
     abortedRuns,
+    priorSegments,
+    rawBuffers,
     clear,
   };
 }
@@ -358,11 +372,22 @@ export function createAgentEventHandler({
     if (!mergedText) {
       return;
     }
-    chatRunState.buffers.set(clientRunId, mergedText);
-    if (isSilentReplyText(mergedText, SILENT_REPLY_TOKEN)) {
+    const lastRaw = chatRunState.rawBuffers.get(clientRunId);
+    const isBoundary = previousText.length > 0 && lastRaw !== undefined && !text.startsWith(lastRaw);
+    if (isBoundary) {
+      const prior = chatRunState.priorSegments.get(clientRunId);
+      chatRunState.priorSegments.set(
+        clientRunId,
+        prior ? `${prior}\n\n${previousText}` : previousText,
+      );
+    }
+    const currentText = isBoundary ? cleanedText : mergedText;
+    chatRunState.rawBuffers.set(clientRunId, text);
+    chatRunState.buffers.set(clientRunId, currentText);
+    if (isSilentReplyText(currentText, SILENT_REPLY_TOKEN)) {
       return;
     }
-    if (isSilentReplyLeadFragment(mergedText)) {
+    if (isSilentReplyLeadFragment(currentText)) {
       return;
     }
     if (shouldHideHeartbeatChatOutput(clientRunId, sourceRunId)) {
@@ -374,7 +399,9 @@ export function createAgentEventHandler({
       return;
     }
     chatRunState.deltaSentAt.set(clientRunId, now);
-    chatRunState.deltaLastBroadcastLen.set(clientRunId, mergedText.length);
+    const prior = chatRunState.priorSegments.get(clientRunId);
+    const fullText = prior ? `${prior}\n\n${currentText}` : currentText;
+    chatRunState.deltaLastBroadcastLen.set(clientRunId, fullText.length);
     const payload = {
       runId: clientRunId,
       sessionKey,
@@ -382,7 +409,7 @@ export function createAgentEventHandler({
       state: "delta" as const,
       message: {
         role: "assistant",
-        content: [{ type: "text", text: mergedText }],
+        content: [{ type: "text", text: fullText }],
         timestamp: now,
       },
     };
@@ -391,9 +418,11 @@ export function createAgentEventHandler({
   };
 
   const resolveBufferedChatTextState = (clientRunId: string, sourceRunId: string) => {
-    const bufferedText = stripInlineDirectiveTagsForDisplay(
-      chatRunState.buffers.get(clientRunId) ?? "",
-    ).text.trim();
+    const currentBuffer = chatRunState.buffers.get(clientRunId) ?? "";
+    const prior = chatRunState.priorSegments.get(clientRunId);
+    const fullBuffer =
+      prior && currentBuffer ? `${prior}\n\n${currentBuffer}` : (prior ?? currentBuffer);
+    const bufferedText = stripInlineDirectiveTagsForDisplay(fullBuffer).text.trim();
     const normalizedHeartbeatText = normalizeHeartbeatChatFinalText({
       runId: clientRunId,
       sourceRunId,
@@ -467,6 +496,8 @@ export function createAgentEventHandler({
     chatRunState.deltaLastBroadcastLen.delete(clientRunId);
     chatRunState.buffers.delete(clientRunId);
     chatRunState.deltaSentAt.delete(clientRunId);
+    chatRunState.priorSegments.delete(clientRunId);
+    chatRunState.rawBuffers.delete(clientRunId);
     if (jobState === "done") {
       const payload = {
         runId: clientRunId,
@@ -627,6 +658,8 @@ export function createAgentEventHandler({
         chatRunState.abortedRuns.delete(evt.runId);
         chatRunState.buffers.delete(clientRunId);
         chatRunState.deltaSentAt.delete(clientRunId);
+        chatRunState.priorSegments.delete(clientRunId);
+        chatRunState.rawBuffers.delete(clientRunId);
         if (chatLink) {
           chatRunState.registry.remove(evt.runId, clientRunId, sessionKey);
         }

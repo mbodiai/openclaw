@@ -75,6 +75,56 @@ async function createTranscriptFixture(prefix: string) {
   return { transcriptPath, sessionId };
 }
 
+function createChatAbortContext(overrides: Record<string, unknown> = {}): {
+  chatAbortControllers: Map<string, ReturnType<typeof createActiveRun>>;
+  chatRunBuffers: Map<string, string>;
+  chatDeltaSentAt: Map<string, number>;
+  chatDeltaLastBroadcastLen: Map<string, number>;
+  chatAbortedRuns: Map<string, number>;
+  chatPriorSegments: Map<string, string>;
+  chatRawBuffers: Map<string, string>;
+  removeChatRun: ReturnType<typeof vi.fn>;
+  agentRunSeq: Map<string, number>;
+  broadcast: ReturnType<typeof vi.fn>;
+  nodeSendToSession: ReturnType<typeof vi.fn>;
+  logGateway: { warn: ReturnType<typeof vi.fn> };
+  dedupe?: { get: ReturnType<typeof vi.fn> };
+} {
+  return {
+    chatAbortControllers: new Map(),
+    chatRunBuffers: new Map(),
+    chatDeltaSentAt: new Map(),
+    chatDeltaLastBroadcastLen: new Map(),
+    chatAbortedRuns: new Map<string, number>(),
+    chatPriorSegments: new Map<string, string>(),
+    chatRawBuffers: new Map<string, string>(),
+    removeChatRun: vi
+      .fn()
+      .mockImplementation((run: string) => ({ sessionKey: "main", clientRunId: run })),
+    agentRunSeq: new Map<string, number>(),
+    broadcast: vi.fn(),
+    nodeSendToSession: vi.fn(),
+    logGateway: { warn: vi.fn() },
+    ...overrides,
+  };
+}
+
+async function invokeChatAbort(
+  context: ReturnType<typeof createChatAbortContext>,
+  params: { sessionKey: string; runId?: string },
+  respond: ReturnType<typeof vi.fn>,
+) {
+  await chatHandlers["chat.abort"]({
+    params,
+    respond: respond as never,
+    context: context as never,
+    req: {} as never,
+    client: null,
+    isWebchatConnect: () => false,
+  });
+}
+
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
