@@ -732,7 +732,7 @@ export function buildHelpMessage(cfg?: OpenClawConfig): string {
   lines.push("  /new  |  /reset  |  /compact [instructions]  |  /stop");
   lines.push("");
 
-  const optionParts = ["/think <level>", "/model <id>", "/fast on|off", "/verbose on|off"];
+  const optionParts = ["/think <level>", "/model <id>", "/fast on|off", "/verbose on|off|full"];
   if (isCommandFlagEnabled(cfg, "config")) {
     optionParts.push("/config");
   }
