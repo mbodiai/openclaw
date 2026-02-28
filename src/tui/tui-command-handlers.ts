@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Component, SelectItem, TUI } from "@mariozechner/pi-tui";
 import {
   formatThinkingLevels,
+  normalizeReasoningLevel,
   normalizeUsageDisplay,
   resolveResponseUsageMode,
 } from "../auto-reply/thinking.js";
@@ -368,15 +369,20 @@ export function createCommandHandlers(context: CommandHandlerContext) {
         break;
       case "reasoning":
         if (!args) {
-          chatLog.addSystem("usage: /reasoning <on|off>");
+          chatLog.addSystem("usage: /reasoning <on|off|stream>");
           break;
         }
         try {
+          const normalized = normalizeReasoningLevel(args);
+          if (!normalized) {
+            chatLog.addSystem("usage: /reasoning <on|off|stream>");
+            break;
+          }
           const result = await client.patchSession({
             key: state.currentSessionKey,
-            reasoningLevel: args,
+            reasoningLevel: normalized,
           });
-          chatLog.addSystem(`reasoning set to ${args}`);
+          chatLog.addSystem(`reasoning set to ${normalized}`);
           applySessionInfoFromPatch(result);
           await refreshSessionInfo();
         } catch (err) {
