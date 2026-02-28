@@ -340,17 +340,17 @@ export async function resolveReplyDirectives(params: {
   const defaultActivation = defaultGroupActivation(requireMention);
   const resolvedThinkLevel =
     directives.thinkLevel ??
-    (agentCfg?.thinkingDefault as ThinkLevel | undefined) ??
-    (sessionEntry?.thinkingLevel as ThinkLevel | undefined);
+    (sessionEntry?.thinkingLevel as ThinkLevel | undefined) ??
+    (agentCfg?.thinkingDefault as ThinkLevel | undefined);
 
   const resolvedVerboseLevel =
     directives.verboseLevel ??
-    (agentCfg?.verboseDefault as VerboseLevel | undefined) ??
-    (sessionEntry?.verboseLevel as VerboseLevel | undefined);
+    (sessionEntry?.verboseLevel as VerboseLevel | undefined) ??
+    (agentCfg?.verboseDefault as VerboseLevel | undefined);
   let resolvedReasoningLevel: ReasoningLevel =
     directives.reasoningLevel ??
-    (agentCfg?.reasoningDefault as ReasoningLevel | undefined) ??
     (sessionEntry?.reasoningLevel as ReasoningLevel | undefined) ??
+    (agentCfg?.reasoningDefault as ReasoningLevel | undefined) ??
     "off";
   const resolvedElevatedLevel = elevatedAllowed
     ? (directives.elevatedLevel ??
