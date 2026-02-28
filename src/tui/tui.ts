@@ -341,7 +341,7 @@ export async function runTui(opts: TuiOptions) {
   let historyLoaded = false;
   let isConnected = false;
   let wasDisconnected = false;
-  let toolsExpanded = true;
+  let toolsExpanded = false;
   let showThinking = true;
   let pairingHintShown = false;
   const localRunIds = new Set<string>();
