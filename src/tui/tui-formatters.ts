@@ -3,6 +3,8 @@ import { stripLeadingInboundMetadata } from "../auto-reply/reply/strip-inbound-m
 import { stripAnsi } from "../terminal/ansi.js";
 import { formatTokenCount } from "../utils/usage-format.js";
 
+export const NO_OUTPUT_PLACEHOLDER = "(no output)";
+
 const REPLACEMENT_CHAR_RE = /\uFFFD/g;
 const MAX_TOKEN_CHARS = 32;
 const LONG_TOKEN_RE = /\S{33,}/g;
@@ -170,7 +172,11 @@ export function resolveFinalAssistantText(params: {
   if (errorMessage.trim()) {
     return formatRawAssistantErrorForUi(errorMessage);
   }
-  return "(no output)";
+  return NO_OUTPUT_PLACEHOLDER;
+}
+
+export function isNoOutputAssistantText(text?: string | null): boolean {
+  return (text ?? "").trim() === NO_OUTPUT_PLACEHOLDER;
 }
 
 export function composeThinkingAndContent(params: {

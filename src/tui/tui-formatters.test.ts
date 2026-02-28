@@ -4,6 +4,8 @@ import {
   extractTextFromMessage,
   extractThinkingFromMessage,
   isCommandMessage,
+  isNoOutputAssistantText,
+  resolveFinalAssistantText,
   sanitizeRenderableText,
 } from "./tui-formatters.js";
 
@@ -282,5 +284,18 @@ describe("sanitizeRenderableText", () => {
     const sanitized = sanitizeRenderableText(input);
 
     expect(sanitized).toBe(input);
+  });
+});
+
+describe("resolveFinalAssistantText", () => {
+  it("falls back to no-output placeholder when both final and streamed are empty", () => {
+    expect(resolveFinalAssistantText({ finalText: "", streamedText: "" })).toBe("(no output)");
+  });
+});
+
+describe("isNoOutputAssistantText", () => {
+  it("detects the no-output placeholder", () => {
+    expect(isNoOutputAssistantText("(no output)")).toBe(true);
+    expect(isNoOutputAssistantText(" done ")).toBe(false);
   });
 });
