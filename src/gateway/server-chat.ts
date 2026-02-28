@@ -145,6 +145,14 @@ export type ChatRunState = {
   buffers: Map<string, string>;
   deltaSentAt: Map<string, number>;
   abortedRuns: Map<string, number>;
+  /** Text from prior assistant messages within the same run, accumulated at message boundaries. */
+  priorSegments: Map<string, string>;
+  /**
+   * Last raw (pre-strip) text seen per run — used for message-boundary detection.
+   * A new assistant message is detected when the new raw text is non-empty and
+   * does not start with the previous raw text.
+   */
+  rawBuffers: Map<string, string>;
   clear: () => void;
 };
 
@@ -153,12 +161,16 @@ export function createChatRunState(): ChatRunState {
   const buffers = new Map<string, string>();
   const deltaSentAt = new Map<string, number>();
   const abortedRuns = new Map<string, number>();
+  const priorSegments = new Map<string, string>();
+  const rawBuffers = new Map<string, string>();
 
   const clear = () => {
     registry.clear();
     buffers.clear();
     deltaSentAt.clear();
     abortedRuns.clear();
+    priorSegments.clear();
+    rawBuffers.clear();
   };
 
   return {
@@ -166,6 +178,8 @@ export function createChatRunState(): ChatRunState {
     buffers,
     deltaSentAt,
     abortedRuns,
+    priorSegments,
+    rawBuffers,
     clear,
   };
 }
@@ -291,6 +305,25 @@ export function createAgentEventHandler({
     if (isSilentReplyText(cleaned, SILENT_REPLY_TOKEN)) {
       return;
     }
+    // Detect new-message boundary: when the agent starts a new assistant
+    // message (typically after a tool call), the accumulated text resets.
+    // Snapshot the current buffer as a prior segment so text from earlier
+    // messages is preserved (#28180).
+    //
+    // Boundary detection uses the *raw* (pre-strip) text and checks whether
+    // the incoming text starts with the previous raw text (continuation) or
+    // not (new message). This is more reliable than a length high-water mark
+    // because a new short message could still be longer than the previous one.
+    // The agent guarantees monotonically growing raw text within a single
+    // message, so any non-prefix raw text is a real boundary.
+    const existing = chatRunState.buffers.get(clientRunId);
+    const lastRaw = chatRunState.rawBuffers.get(clientRunId);
+    const isBoundary = existing && lastRaw !== undefined && !text.startsWith(lastRaw);
+    if (isBoundary) {
+      const prior = chatRunState.priorSegments.get(clientRunId);
+      chatRunState.priorSegments.set(clientRunId, prior ? `${prior}\n\n${existing}` : existing);
+    }
+    chatRunState.rawBuffers.set(clientRunId, text);
     chatRunState.buffers.set(clientRunId, cleaned);
     if (shouldHideHeartbeatChatOutput(clientRunId, sourceRunId)) {
       return;
@@ -301,6 +334,9 @@ export function createAgentEventHandler({
       return;
     }
     chatRunState.deltaSentAt.set(clientRunId, now);
+    // Compose full run text from prior segments + current buffer.
+    const prior = chatRunState.priorSegments.get(clientRunId);
+    const fullText = prior ? `${prior}\n\n${cleaned}` : cleaned;
     const payload = {
       runId: clientRunId,
       sessionKey,
@@ -308,7 +344,7 @@ export function createAgentEventHandler({
       state: "delta" as const,
       message: {
         role: "assistant",
-        content: [{ type: "text", text: cleaned }],
+        content: [{ type: "text", text: fullText }],
         timestamp: now,
       },
     };
@@ -324,9 +360,11 @@ export function createAgentEventHandler({
     jobState: "done" | "error",
     error?: unknown,
   ) => {
-    const bufferedText = stripInlineDirectiveTagsForDisplay(
-      chatRunState.buffers.get(clientRunId) ?? "",
-    ).text.trim();
+    const currentBuffer = chatRunState.buffers.get(clientRunId) ?? "";
+    const prior = chatRunState.priorSegments.get(clientRunId);
+    const fullBuffer =
+      prior && currentBuffer ? `${prior}\n\n${currentBuffer}` : (prior ?? currentBuffer);
+    const bufferedText = stripInlineDirectiveTagsForDisplay(fullBuffer).text.trim();
     const normalizedHeartbeatText = normalizeHeartbeatChatFinalText({
       runId: clientRunId,
       sourceRunId,
@@ -337,6 +375,8 @@ export function createAgentEventHandler({
       normalizedHeartbeatText.suppress || isSilentReplyText(text, SILENT_REPLY_TOKEN);
     chatRunState.buffers.delete(clientRunId);
     chatRunState.deltaSentAt.delete(clientRunId);
+    chatRunState.priorSegments.delete(clientRunId);
+    chatRunState.rawBuffers.delete(clientRunId);
     if (jobState === "done") {
       const payload = {
         runId: clientRunId,
@@ -485,6 +525,8 @@ export function createAgentEventHandler({
         chatRunState.abortedRuns.delete(evt.runId);
         chatRunState.buffers.delete(clientRunId);
         chatRunState.deltaSentAt.delete(clientRunId);
+        chatRunState.priorSegments.delete(clientRunId);
+        chatRunState.rawBuffers.delete(clientRunId);
         if (chatLink) {
           chatRunState.registry.remove(evt.runId, clientRunId, sessionKey);
         }
