@@ -85,7 +85,7 @@ export function getSlashCommands(options: SlashCommandOptions = {}): SlashComman
     },
     {
       name: "verbose",
-      description: "Set verbose on/off",
+      description: "Set verbose on/off/full",
       getArgumentCompletions: verboseCompletions,
     },
     {
@@ -150,7 +150,7 @@ export function helpText(options: SlashCommandOptions = {}): string {
     "/model <provider/model> (or /models)",
     `/think <${thinkLevels}>`,
     "/fast <status|on|off>",
-    "/verbose <on|off>",
+    "/verbose <on|off|full>",
     "/reasoning <on|off|stream>",
     "/usage <off|tokens|full>",
     "/elevated <on|off|ask|full>",
