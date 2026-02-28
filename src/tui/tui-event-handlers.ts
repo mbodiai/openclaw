@@ -29,6 +29,7 @@ type EventHandlerContext = {
   isLocalRunId?: (runId: string) => boolean;
   forgetLocalRunId?: (runId: string) => void;
   clearLocalRunIds?: () => void;
+  onRunSettled?: (runId: string) => void;
 };
 
 export function createEventHandlers(context: EventHandlerContext) {
@@ -42,6 +43,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     isLocalRunId,
     forgetLocalRunId,
     clearLocalRunIds,
+    onRunSettled,
   } = context;
   const finalizedRuns = new Map<string, number>();
   const sessionRuns = new Map<string, number>();
@@ -109,6 +111,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     clearActiveRunIfMatch(params.runId);
     if (params.wasActiveRun) {
       setActivityStatus(params.status);
+      onRunSettled?.(params.runId);
     }
     void refreshSessionInfo?.();
   };
@@ -123,6 +126,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     clearActiveRunIfMatch(params.runId);
     if (params.wasActiveRun) {
       setActivityStatus(params.status);
+      onRunSettled?.(params.runId);
     }
     void refreshSessionInfo?.();
   };
