@@ -121,6 +121,27 @@ function formatReadWithLineNumbers(text: string, args: unknown): string | null {
   return lines.map((line, i) => `${chalk.dim(`${pad(startLine + i)}│`)}${line}`).join("\n");
 }
 
+function formatWriteOutput(args: unknown): string | null {
+  if (!args || typeof args !== "object") {
+    return null;
+  }
+  const a = args as Record<string, unknown>;
+  const content = (a.content ?? a.text ?? a.data ?? "") as string;
+  const filePath = (a.file_path ?? a.path ?? a.filePath ?? "") as string;
+  if (!content) {
+    return null;
+  }
+  const lines = content.split("\n");
+  const parts: string[] = [];
+  if (filePath) {
+    parts.push(chalk.bold.white(`+++ ${filePath} (new file)`));
+  }
+  for (const line of lines) {
+    parts.push(chalk.bgRgb(20, 60, 20).greenBright(`+ ${line}`));
+  }
+  return parts.join("\n");
+}
+
 function formatEditDiff(args: unknown): string | null {
   if (!args || typeof args !== "object") {
     return null;
@@ -269,9 +290,11 @@ export class ToolExecutionComponent extends Container {
     // For edit tools, show a diff of old → new text.
     const isEditTool = this.toolName === "edit" || this.toolName === "str_replace_editor";
     const isReadTool = this.toolName === "read";
+    const isWriteTool = this.toolName === "write";
     const diff = isEditTool ? formatEditDiff(this.args) : null;
+    const writeOutput = isWriteTool ? formatWriteOutput(this.args) : null;
     const numbered = isReadTool && raw ? formatReadWithLineNumbers(raw, this.args) : null;
-    const text = diff ?? numbered ?? raw ?? (this.isPartial ? "…" : "");
+    const text = diff ?? writeOutput ?? numbered ?? raw ?? (this.isPartial ? "…" : "");
     if (!this.expanded && text) {
       const lines = text.split("\n");
       const limit = diff ? PREVIEW_LINES * 2 : PREVIEW_LINES;
