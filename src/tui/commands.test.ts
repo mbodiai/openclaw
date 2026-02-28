@@ -32,4 +32,13 @@ describe("helpText", () => {
     expect(output).toContain("/elevated <on|off|ask|full>");
     expect(output).toContain("/elev <on|off|ask|full>");
   });
+
+  it("offers reasoning stream mode", () => {
+    const commands = getSlashCommands({});
+    const reasoning = commands.find((command) => command.name === "reasoning");
+    expect(reasoning).toBeTruthy();
+    expect(reasoning?.getArgumentCompletions?.("")).toEqual(
+      expect.arrayContaining([{ value: "stream", label: "stream" }]),
+    );
+  });
 });

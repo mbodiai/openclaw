@@ -170,4 +170,46 @@ describe("tui command handlers", () => {
     expect(addSystem).toHaveBeenCalledWith("not connected to gateway — message not sent");
     expect(setActivityStatus).toHaveBeenLastCalledWith("disconnected");
   });
+
+  it("normalizes /reasoning streaming to stream", async () => {
+    const patchSession = vi.fn().mockResolvedValue(undefined);
+    const addSystem = vi.fn();
+    const refreshSessionInfo = vi.fn().mockResolvedValue(undefined);
+
+    const { handleCommand } = createCommandHandlers({
+      client: { patchSession } as never,
+      chatLog: { addUser: vi.fn(), addSystem } as never,
+      tui: { requestRender: vi.fn() } as never,
+      opts: {},
+      state: {
+        currentSessionKey: "agent:main:main",
+        activeChatRunId: null,
+        isConnected: true,
+        sessionInfo: {},
+      } as never,
+      deliverDefault: false,
+      openOverlay: vi.fn(),
+      closeOverlay: vi.fn(),
+      refreshSessionInfo,
+      loadHistory: vi.fn(),
+      setSession: vi.fn(),
+      refreshAgents: vi.fn(),
+      abortActive: vi.fn(),
+      setActivityStatus: vi.fn(),
+      formatSessionKey: vi.fn(),
+      applySessionInfoFromPatch: vi.fn(),
+      noteLocalRunId: vi.fn(),
+      forgetLocalRunId: vi.fn(),
+      requestExit: vi.fn(),
+    });
+
+    await handleCommand("/reasoning streaming");
+
+    expect(patchSession).toHaveBeenCalledWith({
+      key: "agent:main:main",
+      reasoningLevel: "stream",
+    });
+    expect(addSystem).toHaveBeenCalledWith("reasoning set to stream");
+    expect(refreshSessionInfo).toHaveBeenCalled();
+  });
 });
