@@ -290,7 +290,7 @@ export async function runTui(opts: TuiOptions) {
   let historyLoaded = false;
   let isConnected = false;
   let wasDisconnected = false;
-  let toolsExpanded = false;
+  let toolsExpanded = true;
   let showThinking = true;
   let pairingHintShown = false;
   const localRunIds = new Set<string>();
