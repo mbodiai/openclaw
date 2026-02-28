@@ -119,18 +119,24 @@ function formatEditDiff(args: unknown): string | null {
     return null;
   }
   const filePath = (a.file_path ?? a.path ?? a.filePath ?? "") as string;
+  // Try to get starting line from offset/line args (1-indexed).
+  const startLine = Number(a.offset ?? a.line ?? a.startLine ?? 1) || 1;
   const oldLines = oldText.split("\n");
   const newLines = newText.split("\n");
+  const gutterWidth = String(startLine + Math.max(oldLines.length, newLines.length) - 1).length;
+  const pad = (n: number) => String(n).padStart(gutterWidth);
   const parts: string[] = [];
   if (filePath) {
     parts.push(chalk.bold.white(`--- ${filePath}`));
     parts.push(chalk.bold.white(`+++ ${filePath}`));
   }
-  for (const line of oldLines) {
-    parts.push(chalk.bgRgb(80, 20, 20).redBright(`- ${line}`));
+  for (let i = 0; i < oldLines.length; i++) {
+    const ln = chalk.dim(`${pad(startLine + i)}│`);
+    parts.push(`${ln}${chalk.bgRgb(80, 20, 20).redBright(`- ${oldLines[i]}`)}`);
   }
-  for (const line of newLines) {
-    parts.push(chalk.bgRgb(20, 60, 20).greenBright(`+ ${line}`));
+  for (let i = 0; i < newLines.length; i++) {
+    const ln = chalk.dim(`${pad(startLine + i)}│`);
+    parts.push(`${ln}${chalk.bgRgb(20, 60, 20).greenBright(`+ ${newLines[i]}`)}`);
   }
   return parts.join("\n");
 }
