@@ -17,7 +17,7 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { getSlashCommands } from "./commands.js";
-import { setThinkingExpandedView, setVerboseFullMode } from "./components/assistant-message.js";
+import { setThinkingExpandedView, setThinkingVisibleView, setVerboseFullMode } from "./components/assistant-message.js";
 import { ChatLog } from "./components/chat-log.js";
 import { CustomEditor } from "./components/custom-editor.js";
 import { GatewayChatClient } from "./gateway-chat.js";
@@ -1042,7 +1042,9 @@ export async function runTui(opts: TuiOptions) {
   };
   editor.onCtrlT = () => {
     showThinking = !showThinking;
-    void loadHistory();
+    setThinkingVisibleView(showThinking);
+    chatLog.refreshAssistantMessages();
+    tui.requestRender();
   };
 
   tui.addInputListener((data) => {
@@ -1063,8 +1065,10 @@ export async function runTui(opts: TuiOptions) {
   editor.onCtrlY = () => {
     const next = !thinkingExpanded;
     setThinkingExpanded(next);
+    setThinkingExpandedView(next);
     setActivityStatus(next ? "thinking expanded" : "thinking compact");
-    void loadHistory();
+    chatLog.refreshAssistantMessages();
+    tui.requestRender();
   };
 
   client.onEvent = (evt) => {
