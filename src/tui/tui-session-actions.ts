@@ -25,6 +25,8 @@ type SessionActionContext = {
   updateAutocompleteProvider: () => void;
   setActivityStatus: (text: string) => void;
   clearLocalRunIds?: () => void;
+  /** Called after loadHistory completes to replay buffered agent events. */
+  onHistoryLoaded?: () => void;
 };
 
 type SessionInfoDefaults = {
@@ -373,8 +375,10 @@ export function createSessionActions(context: SessionActionContext) {
       state.historyLoaded = true;
     } catch (err) {
       chatLog.addSystem(`history failed: ${String(err)}`);
+      state.historyLoaded = true; // Mark loaded even on error so events aren't buffered forever.
     }
     await refreshSessionInfo();
+    context.onHistoryLoaded?.();
     tui.requestRender();
   };
 
