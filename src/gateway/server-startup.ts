@@ -1,3 +1,4 @@
+import path from "node:path";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { ACP_SESSION_IDENTITY_RENDERER_VERSION } from "../acp/runtime/session-identifiers.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
@@ -12,6 +13,9 @@ import { cleanStaleLockFiles } from "../agents/session-write-lock.js";
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
+import { isPrimarySessionTranscriptFileName } from "../config/sessions/artifacts.js";
+import { resolveSessionFilePath } from "../config/sessions/paths.js";
+import { loadSessionStore } from "../config/sessions/store.js";
 import { startGmailWatcherWithLogs } from "../hooks/gmail-watcher-lifecycle.js";
 import {
   clearInternalHooks,
@@ -28,8 +32,67 @@ import {
   shouldWakeFromRestartSentinel,
 } from "./server-restart-sentinel.js";
 import { startGatewayMemoryBackend } from "./server-startup-memory.js";
+import { archiveFileOnDisk } from "./session-utils.fs.js";
 
 const SESSION_LOCK_STALE_MS = 30 * 60 * 1000;
+const ORPHAN_CLEANUP_THRESHOLD = 10;
+
+async function cleanupOrphanTranscripts(params: {
+  sessionsDir: string;
+  storePath: string;
+  log: { warn: (msg: string) => void; info: (msg: string) => void };
+}): Promise<number> {
+  const fs = await import("node:fs");
+
+  if (!fs.existsSync(params.storePath)) {
+    return 0;
+  }
+
+  const store = loadSessionStore(params.storePath, { skipCache: true });
+  const referencedPaths = new Set<string>();
+
+  for (const entry of Object.values(store)) {
+    if (!entry?.sessionId) {
+      continue;
+    }
+    try {
+      const resolved = resolveSessionFilePath(entry.sessionId, entry, {
+        sessionsDir: params.sessionsDir,
+      });
+      referencedPaths.add(path.resolve(resolved));
+    } catch {
+      // ignore invalid paths
+    }
+  }
+
+  const entries = await fs.promises.readdir(params.sessionsDir, { withFileTypes: true });
+  const orphanFiles = entries.filter(
+    (entry) => entry.isFile() && isPrimarySessionTranscriptFileName(entry.name),
+  );
+
+  if (orphanFiles.length < ORPHAN_CLEANUP_THRESHOLD) {
+    return 0;
+  }
+
+  let archived = 0;
+  for (const entry of orphanFiles) {
+    const filePath = path.join(params.sessionsDir, entry.name);
+    if (referencedPaths.has(path.resolve(filePath))) {
+      continue;
+    }
+    try {
+      archiveFileOnDisk(filePath, "deleted");
+      archived += 1;
+    } catch {
+      // best-effort
+    }
+  }
+
+  if (archived > 0) {
+    params.log.info(`archived ${archived} orphan transcript file(s) in ${params.sessionsDir}`);
+  }
+  return archived;
+}
 
 export async function startGatewaySidecars(params: {
   cfg: ReturnType<typeof loadConfig>;
@@ -55,6 +118,12 @@ export async function startGatewaySidecars(params: {
         staleMs: SESSION_LOCK_STALE_MS,
         removeStale: true,
         log: { warn: (message) => params.log.warn(message) },
+      });
+      const storePath = path.join(sessionsDir, "sessions.json");
+      await cleanupOrphanTranscripts({
+        sessionsDir,
+        storePath,
+        log: { warn: params.log.warn, info: params.logHooks.info },
       });
     }
   } catch (err) {
