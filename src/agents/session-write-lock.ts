@@ -479,9 +479,24 @@ export async function acquireSessionWriteLock(params: {
         throw err;
       }
       const payload = await readLockPayload(lockPath);
-      const nowMs = Date.now();
-      const inspected = inspectLockPayload(payload, staleMs, nowMs);
-      if (await shouldReclaimContendedLockFile(lockPath, inspected, staleMs, nowMs)) {
+      const inspected = inspectLockPayload(payload, staleMs, Date.now());
+
+      // Self-leak detection: if the lock file was written by THIS process
+      // but isn't tracked in HELD_LOCKS, it's a leaked lock from a previous
+      // agent run whose release() failed (e.g. handle.close() threw after
+      // HELD_LOCKS.delete()). The PID is alive (it's us), so stale detection
+      // can't help — we'd wait forever. Break the lock immediately.
+      const selfLeaked =
+        typeof payload?.pid === "number" &&
+        payload.pid === process.pid &&
+        !HELD_LOCKS.has(normalizedSessionFile);
+      if (inspected.stale || selfLeaked) {
+        if (selfLeaked) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[session-write-lock] breaking self-leaked lock (pid=${payload?.pid}, not in HELD_LOCKS): ${lockPath}`,
+          );
+        }
         await fs.rm(lockPath, { force: true });
         continue;
       }
