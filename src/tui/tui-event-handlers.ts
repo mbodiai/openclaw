@@ -309,7 +309,9 @@ export function createEventHandlers(context: EventHandlerContext) {
       return;
     }
     if (evt.stream === "tool") {
-      const verbose = state.sessionInfo.verboseLevel ?? "off";
+      // Default to "full" when session info hasn't loaded yet, so tool events
+      // are never silently dropped during the connect → loadHistory race.
+      const verbose = state.sessionInfo.verboseLevel ?? "full";
       const allowToolEvents = verbose !== "off";
       const allowToolOutput = verbose === "full";
       if (!allowToolEvents) {
