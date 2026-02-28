@@ -22,6 +22,7 @@ export type SlashCommandOptions = {
 
 const COMMAND_ALIASES: Record<string, string> = {
   elev: "elevated",
+  stop: "abort",
 };
 
 function createLevelCompletion(
@@ -106,7 +107,7 @@ export function getSlashCommands(options: SlashCommandOptions = {}): SlashComman
       description: "Set group activation",
       getArgumentCompletions: activationCompletions,
     },
-    { name: "abort", description: "Abort active run" },
+    { name: "abort", description: "Abort active run (or /stop)" },
     { name: "new", description: "Reset the session" },
     { name: "reset", description: "Reset the session" },
     { name: "settings", description: "Open settings" },
