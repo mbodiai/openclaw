@@ -551,6 +551,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
         break;
       case "abort":
         await abortActive();
+        clearQueue();
         break;
       case "settings":
         openSettings();
@@ -566,10 +567,19 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     tui.requestRender();
   };
 
+  const clearQueue = () => {
+    const dropped = queuedMessages.length;
+    queuedMessages.length = 0;
+    if (dropped > 0) {
+      chatLog.addSystem(`dropped ${dropped} queued message${dropped > 1 ? "s" : ""}`);
+    }
+  };
+
   return {
     handleCommand,
     sendMessage,
     flushQueuedMessage,
+    clearQueue,
     openModelSelector,
     openAgentSelector,
     openSessionSelector,

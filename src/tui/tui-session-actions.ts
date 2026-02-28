@@ -400,12 +400,17 @@ export function createSessionActions(context: SessionActionContext) {
       tui.requestRender();
       return;
     }
+    const runId = state.activeChatRunId;
+    // Immediately clear local state so the UI stops queuing messages.
+    // The server lifecycle event will be a no-op since activeChatRunId is already null.
+    state.activeChatRunId = null;
+    setActivityStatus("aborted");
+    tui.requestRender();
     try {
       await client.abortChat({
         sessionKey: state.currentSessionKey,
-        runId: state.activeChatRunId,
+        runId,
       });
-      setActivityStatus("aborted");
     } catch (err) {
       chatLog.addSystem(`abort failed: ${String(err)}`);
       setActivityStatus("abort failed");
