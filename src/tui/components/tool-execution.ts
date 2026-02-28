@@ -80,7 +80,11 @@ function formatArgs(toolName: string, args: unknown): string {
     return "";
   }
   try {
-    return sanitizeRenderableText(JSON.stringify(args));
+    const json = JSON.stringify(args);
+    if (json === "{}" || json === "[]") {
+      return "";
+    }
+    return sanitizeRenderableText(json);
   } catch {
     return "";
   }
@@ -184,8 +188,15 @@ export class ToolExecutionComponent extends Container {
     this.header.setText(colorFamily(theme.bold(title), family));
 
     const argLine = formatArgs(this.toolName, this.args);
-    const timeline = `timeline: start → args${this.updateCount > 0 ? ` → updates x${this.updateCount}` : ""}${this.isPartial ? "" : " → result"}`;
-    this.argsLine.setText(theme.dim(`${timeline}${argLine ? ` | ${argLine}` : ""}`));
+    if (argLine) {
+      const timeline = `timeline: start → args${this.updateCount > 0 ? ` → updates x${this.updateCount}` : ""}${this.isPartial ? "" : " → result"}`;
+      this.argsLine.setText(theme.dim(`${timeline} | ${argLine}`));
+    } else if (this.isPartial || this.updateCount > 0) {
+      const timeline = `timeline: start → args${this.updateCount > 0 ? ` → updates x${this.updateCount}` : ""}${this.isPartial ? "" : " → result"}`;
+      this.argsLine.setText(theme.dim(timeline));
+    } else {
+      this.argsLine.setText("");
+    }
 
     const text = raw || (this.isPartial ? "…" : "");
     if (!this.expanded && text) {
