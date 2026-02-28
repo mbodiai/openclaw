@@ -315,6 +315,70 @@ describe("sessions", () => {
     expect(store[sessionKey]?.origin?.chatType).toBe("group");
   });
 
+  it("updateLastRoute preserves existing updatedAt (does not reset idle/daily freshness clock)", async () => {
+    // Regression test for #27102: recordInboundSession → updateLastRoute was
+    // bumping updatedAt to Date.now(), which caused evaluateSessionFreshness()
+    // to always see a fresh session (0ms idle) and never trigger idle/daily resets.
+    const mainSessionKey = "agent:main:main";
+    const dir = await createCaseDir("updateLastRoute-preserves-updatedAt");
+    const storePath = path.join(dir, "sessions.json");
+
+    // Simulate a session that was last active 10 minutes ago.
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    await fs.writeFile(
+      storePath,
+      JSON.stringify(
+        {
+          [mainSessionKey]: {
+            sessionId: "sess-stale",
+            updatedAt: tenMinutesAgo,
+            systemSent: true,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    await updateLastRoute({
+      storePath,
+      sessionKey: mainSessionKey,
+      deliveryContext: {
+        channel: "telegram",
+        to: "999",
+      },
+    });
+
+    // updatedAt must NOT have been bumped to Date.now() — it must still
+    // reflect the time of the last actual reply so idle-reset detection works.
+    const store = loadSessionStore(storePath);
+    expect(store[mainSessionKey]?.updatedAt).toBe(tenMinutesAgo);
+    // Routing fields are still updated normally.
+    expect(store[mainSessionKey]?.lastChannel).toBe("telegram");
+    expect(store[mainSessionKey]?.lastTo).toBe("999");
+  });
+
+  it("updateLastRoute sets updatedAt for brand-new sessions with no existing entry", async () => {
+    const mainSessionKey = "agent:main:main";
+    const dir = await createCaseDir("updateLastRoute-new-session-updatedAt");
+    const storePath = path.join(dir, "sessions.json");
+    await fs.writeFile(storePath, "{}", "utf-8");
+
+    const before = Date.now();
+    await updateLastRoute({
+      storePath,
+      sessionKey: mainSessionKey,
+      deliveryContext: { channel: "telegram", to: "42" },
+    });
+    const after = Date.now();
+
+    const store = loadSessionStore(storePath);
+    const updatedAt = store[mainSessionKey]?.updatedAt ?? 0;
+    expect(updatedAt).toBeGreaterThanOrEqual(before);
+    expect(updatedAt).toBeLessThanOrEqual(after);
+  });
+
   it("updateSessionStoreEntry preserves existing fields when patching", async () => {
     const sessionKey = "agent:main:main";
     const { storePath } = await createSessionStoreFixture({

@@ -1146,6 +1146,17 @@ export async function updateLastRoute(params: {
       existing,
       metaPatch ? { ...basePatch, ...metaPatch } : basePatch,
     );
+    // Restore the pre-inbound updatedAt so that evaluateSessionFreshness()
+    // (called later in initSessionState) is not fooled into thinking the
+    // session is always fresh just because we recorded a delivery route.
+    // mergeSessionEntry unconditionally advances updatedAt to Date.now().
+    // updatedAt is the freshness clock for idle/daily session resets and must
+    // only advance when an actual assistant reply is written (handled by the
+    // reply pipeline via session-updates). For brand-new entries (no existing
+    // entry) we leave the current time in place so the first reply is fresh.
+    if (existing?.updatedAt != null) {
+      next.updatedAt = existing.updatedAt;
+    }
     store[resolved.normalizedKey] = next;
     for (const legacyKey of resolved.legacyKeys) {
       delete store[legacyKey];
