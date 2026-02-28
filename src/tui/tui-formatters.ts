@@ -6,7 +6,7 @@ import { formatTokenCount } from "../utils/usage-format.js";
 export const NO_OUTPUT_PLACEHOLDER = "(no output)";
 
 const REPLACEMENT_CHAR_RE = /\uFFFD/g;
-const MAX_TOKEN_CHARS = 32;
+const MAX_TOKEN_CHARS = 1000;
 const LONG_TOKEN_RE = /\S{33,}/g;
 const LONG_TOKEN_TEST_RE = /\S{33,}/;
 const BINARY_LINE_REPLACEMENT_THRESHOLD = 12;
