@@ -123,14 +123,14 @@ function formatEditDiff(args: unknown): string | null {
   const newLines = newText.split("\n");
   const parts: string[] = [];
   if (filePath) {
-    parts.push(chalk.bold(`--- ${filePath}`));
-    parts.push(chalk.bold(`+++ ${filePath}`));
+    parts.push(chalk.bold.white(`--- ${filePath}`));
+    parts.push(chalk.bold.white(`+++ ${filePath}`));
   }
   for (const line of oldLines) {
-    parts.push(chalk.red(`- ${line}`));
+    parts.push(chalk.bgRgb(80, 20, 20).redBright(`- ${line}`));
   }
   for (const line of newLines) {
-    parts.push(chalk.green(`+ ${line}`));
+    parts.push(chalk.bgRgb(20, 60, 20).greenBright(`+ ${line}`));
   }
   return parts.join("\n");
 }
