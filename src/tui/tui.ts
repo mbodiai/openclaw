@@ -17,7 +17,7 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { getSlashCommands } from "./commands.js";
-import { setThinkingExpandedView } from "./components/assistant-message.js";
+import { setThinkingExpandedView, setVerboseFullMode } from "./components/assistant-message.js";
 import { ChatLog } from "./components/chat-log.js";
 import { CustomEditor } from "./components/custom-editor.js";
 import { GatewayChatClient } from "./gateway-chat.js";
@@ -423,6 +423,7 @@ export async function runTui(opts: TuiOptions) {
     },
     set sessionInfo(value) {
       sessionInfo = value;
+      setVerboseFullMode(value.verboseLevel === "full");
     },
     get initialSessionApplied() {
       return initialSessionApplied;
