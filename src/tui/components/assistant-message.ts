@@ -55,6 +55,11 @@ export function setThinkingExpandedView(value: boolean) {
   thinkingExpandedView = value;
 }
 
+let thinkingVisible = true;
+export function setThinkingVisibleView(value: boolean) {
+  thinkingVisible = value;
+}
+
 let verboseFullMode = false;
 export function setVerboseFullMode(value: boolean) {
   verboseFullMode = value;
@@ -79,8 +84,15 @@ export class AssistantMessageComponent extends Container {
   }
 
   setText(text: string) {
+    // Save raw text to allow toggling thinking visibility without re-fetching
+    (this as any)._rawText = text;
+    this.refresh();
+  }
+
+  refresh() {
+    const text = (this as any)._rawText || "";
     const { thinking, content } = splitThinkingPrefix(text);
-    if (thinking) {
+    if (thinking && thinkingVisible) {
       const normalized = normalizeThinkingForUi(thinking);
       const expanded = thinkingExpandedView || verboseFullMode;
       const shown = expanded ? normalized : compactThinkingForUi(normalized);
