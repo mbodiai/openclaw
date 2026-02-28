@@ -524,10 +524,22 @@ export async function acquireSessionWriteLock(params: {
       const payload = await readLockPayload(lockPath);
       const nowMs = Date.now();
       const inspected = inspectLockPayload(payload, staleMs, nowMs);
+
+      // Orphan-self-lock detection (local): if the lock was left by our own
+      // process targeting the same session file, treat it as stale.
       const orphanSelfLock = shouldTreatAsOrphanSelfLock({
         payload,
         normalizedSessionFile,
       });
+
+      // Self-leak detection (upstream): if the lock was written by THIS
+      // process but isn't tracked in HELD_LOCKS, it's a leaked lock from a
+      // previous agent run whose release() failed. Break immediately.
+      const selfLeaked =
+        typeof payload?.pid === "number" &&
+        payload.pid === process.pid &&
+        !HELD_LOCKS.has(normalizedSessionFile);
+
       const reclaimDetails = orphanSelfLock
         ? {
             ...inspected,
@@ -537,7 +549,15 @@ export async function acquireSessionWriteLock(params: {
               : [...inspected.staleReasons, "orphan-self-pid"],
           }
         : inspected;
-      if (await shouldReclaimContendedLockFile(lockPath, reclaimDetails, staleMs, nowMs)) {
+
+      if (selfLeaked) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[session-write-lock] breaking self-leaked lock (pid=${payload?.pid}, not in HELD_LOCKS): ${lockPath}`,
+        );
+      }
+
+      if (selfLeaked || await shouldReclaimContendedLockFile(lockPath, reclaimDetails, staleMs, nowMs)) {
         await fs.rm(lockPath, { force: true });
         continue;
       }
