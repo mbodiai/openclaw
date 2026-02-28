@@ -11,7 +11,7 @@ export class ChatLog extends Container {
   private toolById = new Map<string, ToolExecutionComponent>();
   private streamingRuns = new Map<string, AssistantMessageComponent>();
   private btwMessage: BtwInlineMessage | null = null;
-  private toolsExpanded = false;
+  private toolsExpanded = true;
 
   constructor(maxComponents = 180) {
     super();
