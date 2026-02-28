@@ -872,6 +872,7 @@ export async function runTui(opts: TuiOptions) {
     handleCommand,
     sendMessage,
     flushQueuedMessage,
+    clearQueue,
     openModelSelector,
     openAgentSelector,
     openSessionSelector,
@@ -934,8 +935,15 @@ export async function runTui(opts: TuiOptions) {
 
   editor.onEscape = () => {
     void abortActive();
+    clearQueue();
   };
   const handleCtrlC = () => {
+    // If a run is active, abort it first (and clear queue).
+    if (state.activeChatRunId) {
+      void abortActive();
+      clearQueue();
+      return;
+    }
     const now = Date.now();
     const decision = resolveCtrlCAction({
       hasInput: editor.getText().trim().length > 0,
