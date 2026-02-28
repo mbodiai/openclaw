@@ -108,6 +108,33 @@ function extractText(result?: ToolResult): string {
   return lines.join("\n").trim();
 }
 
+function formatEditDiff(args: unknown): string | null {
+  if (!args || typeof args !== "object") {
+    return null;
+  }
+  const a = args as Record<string, unknown>;
+  const oldText = (a.oldText ?? a.old_string ?? a.oldContent ?? "") as string;
+  const newText = (a.newText ?? a.new_string ?? a.newContent ?? "") as string;
+  if (!oldText && !newText) {
+    return null;
+  }
+  const filePath = (a.file_path ?? a.path ?? a.filePath ?? "") as string;
+  const oldLines = oldText.split("\n");
+  const newLines = newText.split("\n");
+  const parts: string[] = [];
+  if (filePath) {
+    parts.push(`--- ${filePath}`);
+    parts.push(`+++ ${filePath}`);
+  }
+  for (const line of oldLines) {
+    parts.push(`- ${line}`);
+  }
+  for (const line of newLines) {
+    parts.push(`+ ${line}`);
+  }
+  return parts.join("\n");
+}
+
 export class ToolExecutionComponent extends Container {
   private box: Box;
   private header: Text;
@@ -198,11 +225,15 @@ export class ToolExecutionComponent extends Container {
       this.argsLine.setText("");
     }
 
-    const text = raw || (this.isPartial ? "…" : "");
+    // For edit tools, show a diff of old → new text.
+    const isEditTool = this.toolName === "edit" || this.toolName === "str_replace_editor";
+    const diff = isEditTool ? formatEditDiff(this.args) : null;
+    const text = diff ?? raw ?? (this.isPartial ? "…" : "");
     if (!this.expanded && text) {
       const lines = text.split("\n");
+      const limit = diff ? PREVIEW_LINES * 2 : PREVIEW_LINES;
       const preview =
-        lines.length > PREVIEW_LINES ? `${lines.slice(0, PREVIEW_LINES).join("\n")}\n…` : text;
+        lines.length > limit ? `${lines.slice(0, limit).join("\n")}\n…` : text;
       this.output.setText(preview);
     } else {
       this.output.setText(text);
