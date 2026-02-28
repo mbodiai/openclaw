@@ -631,7 +631,17 @@ export async function runTui(opts: TuiOptions) {
     }
     const preview = liveThinkingPreview.trim();
     if (preview) {
-      parts.push(`thinking ... ${preview}`);
+      // Budget thinking preview to fit available terminal width.
+      // Reserve space for the base + separator + "thinking ... " prefix.
+      const cols = process.stdout.columns || 120;
+      const overhead = parts.join(" | ").length + " | thinking ... ".length;
+      const budget = Math.max(40, cols - overhead - 4);
+      const normalized = preview.replace(/\s+/g, " ");
+      const truncated =
+        normalized.length <= budget
+          ? normalized
+          : `…${normalized.slice(-(budget - 1))}`;
+      parts.push(`thinking ... ${truncated}`);
     }
     return parts.join(" | ");
   };
