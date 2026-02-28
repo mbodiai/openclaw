@@ -189,7 +189,7 @@ export function composeThinkingAndContent(params: {
   const parts: string[] = [];
 
   if (params.showThinking && thinkingText) {
-    parts.push(`[thinking]\n${thinkingText}`);
+    parts.push(`[thinking]\n${thinkingText}\n[thinking_end]`);
   }
   if (contentText) {
     parts.push(contentText);
