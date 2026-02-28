@@ -426,4 +426,38 @@ describe("tui-event-handlers: handleAgentEvent", () => {
     expect(chatLog.dropAssistant).toHaveBeenCalledWith("run-silent");
     expect(chatLog.finalizeAssistant).not.toHaveBeenCalled();
   });
+
+  it("retries history refresh for local runs when final output is empty", () => {
+    vi.useFakeTimers();
+    try {
+      const state = makeState({ activeChatRunId: null });
+      const context = makeContext(state);
+      context.noteLocalRunId("local-run");
+
+      const { handleChatEvent } = createEventHandlers({
+        chatLog: context.chatLog,
+        tui: context.tui,
+        state,
+        setActivityStatus: context.setActivityStatus,
+        loadHistory: context.loadHistory,
+        isLocalRunId: context.isLocalRunId,
+        forgetLocalRunId: context.forgetLocalRunId,
+      });
+
+      handleChatEvent({
+        runId: "local-run",
+        sessionKey: state.currentSessionKey,
+        state: "final",
+        message: { content: [] },
+      });
+
+      expect(context.loadHistory).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(200);
+      expect(context.loadHistory).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(800);
+      expect(context.loadHistory).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

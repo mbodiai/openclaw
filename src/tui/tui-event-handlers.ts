@@ -1,4 +1,9 @@
-import { asString, extractTextFromMessage, isCommandMessage } from "./tui-formatters.js";
+import {
+  asString,
+  extractTextFromMessage,
+  isCommandMessage,
+  isNoOutputAssistantText,
+} from "./tui-formatters.js";
 import { TuiStreamAssembler } from "./tui-stream-assembler.js";
 import type { AgentEvent, ChatEvent, TuiStateAccess } from "./tui-types.js";
 
@@ -45,8 +50,10 @@ export function createEventHandlers(context: EventHandlerContext) {
     clearLocalRunIds,
     onRunSettled,
   } = context;
+  const LOCAL_NO_OUTPUT_HISTORY_FALLBACK_DELAYS_MS = [200, 1000];
   const finalizedRuns = new Map<string, number>();
   const sessionRuns = new Map<string, number>();
+  const noOutputFallbackTimers = new Map<string, NodeJS.Timeout[]>();
   let streamAssembler = new TuiStreamAssembler();
   let lastSessionKey = state.currentSessionKey;
 
@@ -78,6 +85,12 @@ export function createEventHandlers(context: EventHandlerContext) {
       return;
     }
     lastSessionKey = state.currentSessionKey;
+    for (const timers of noOutputFallbackTimers.values()) {
+      for (const timer of timers) {
+        clearTimeout(timer);
+      }
+    }
+    noOutputFallbackTimers.clear();
     finalizedRuns.clear();
     sessionRuns.clear();
     streamAssembler = new TuiStreamAssembler();
@@ -150,6 +163,24 @@ export function createEventHandlers(context: EventHandlerContext) {
     void loadHistory?.();
   };
 
+  const scheduleNoOutputHistoryFallback = (runId: string, sessionKey: string) => {
+    if (!loadHistory || noOutputFallbackTimers.has(runId)) {
+      return;
+    }
+    const timers = LOCAL_NO_OUTPUT_HISTORY_FALLBACK_DELAYS_MS.map((delayMs, index) =>
+      setTimeout(() => {
+        if (state.currentSessionKey !== sessionKey) {
+          return;
+        }
+        void loadHistory();
+        if (index === LOCAL_NO_OUTPUT_HISTORY_FALLBACK_DELAYS_MS.length - 1) {
+          noOutputFallbackTimers.delete(runId);
+        }
+      }, delayMs),
+    );
+    noOutputFallbackTimers.set(runId, timers);
+  };
+
   const handleChatEvent = (payload: unknown) => {
     if (!payload || typeof payload !== "object") {
       return;
@@ -208,11 +239,15 @@ export function createEventHandlers(context: EventHandlerContext) {
 
       const finalText = streamAssembler.finalize(evt.runId, evt.message, state.showThinking);
       const suppressEmptyExternalPlaceholder =
-        finalText === "(no output)" && !isLocalRunId?.(evt.runId);
+        isNoOutputAssistantText(finalText) && !isLocalRunId?.(evt.runId);
+      const isLocalRun = isLocalRunId?.(evt.runId) ?? false;
       if (suppressEmptyExternalPlaceholder) {
         chatLog.dropAssistant(evt.runId);
       } else {
         chatLog.finalizeAssistant(finalText, evt.runId);
+      }
+      if (isLocalRun && isNoOutputAssistantText(finalText) && stopReason !== "error") {
+        scheduleNoOutputHistoryFallback(evt.runId, evt.sessionKey);
       }
       finalizeRun({
         runId: evt.runId,
