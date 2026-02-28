@@ -1711,6 +1711,7 @@ export async function runEmbeddedAttempt(
     let sessionManager: ReturnType<typeof guardSessionManager> | undefined;
     let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined;
     let removeToolResultContextGuard: (() => void) | undefined;
+    let queueHandle: EmbeddedPiQueueHandle | undefined;
     try {
       await repairSessionFileIfNeeded({
         sessionFile: params.sessionFile,
@@ -2226,7 +2227,7 @@ export async function runEmbeddedAttempt(
         getCompactionCount,
       } = subscription;
 
-      const queueHandle: EmbeddedPiQueueHandle = {
+      queueHandle = {
         queueMessage: async (text: string) => {
           await activeSession.steer(text);
         },
@@ -2716,7 +2717,9 @@ export async function runEmbeddedAttempt(
             `CRITICAL: unsubscribe failed, possible resource leak: runId=${params.runId} ${String(err)}`,
           );
         }
-        clearActiveEmbeddedRun(params.sessionId, queueHandle, params.sessionKey);
+        // Note: clearActiveEmbeddedRun moved to outer finally block, AFTER
+        // flushPendingToolResults, to avoid signaling "run ended" before tool
+        // results are written (prevents message ordering conflicts).
         params.abortSignal?.removeEventListener?.("abort", onAbort);
       }
 
@@ -2803,7 +2806,10 @@ export async function runEmbeddedAttempt(
         clearPendingOnTimeout: true,
       });
       session?.dispose();
-      releaseWsSession(params.sessionId);
+      // Signal run ended AFTER tool results are flushed, so followup runs see complete transcripts.
+      if (queueHandle) {
+        clearActiveEmbeddedRun(params.sessionId, queueHandle, params.sessionKey);
+      }
       await sessionLock.release();
     }
   } finally {
