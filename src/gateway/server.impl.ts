@@ -1,6 +1,9 @@
 import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
-import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
+import {
+  abortAllEmbeddedPiRuns,
+  getActiveEmbeddedRunCount,
+} from "../agents/pi-embedded-runner/runs.js";
 import {
   bumpSkillsSnapshotVersion,
   registerSkillsChangeListener,
@@ -1033,6 +1036,8 @@ export async function startGatewayServer(
     heartbeatRunner,
     updateCheckStop: stopGatewayUpdateCheck,
     nodePresenceTimers,
+    chatAbortControllers,
+    abortAllEmbeddedRuns: abortAllEmbeddedPiRuns,
     broadcast,
     tickInterval,
     healthInterval,
