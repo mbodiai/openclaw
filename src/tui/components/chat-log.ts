@@ -9,7 +9,7 @@ export class ChatLog extends Container {
   private readonly maxComponents: number;
   private toolById = new Map<string, ToolExecutionComponent>();
   private streamingRuns = new Map<string, AssistantMessageComponent>();
-  private toolsExpanded = true;
+  private toolsExpanded = false;
 
   constructor(maxComponents = 180) {
     super();
