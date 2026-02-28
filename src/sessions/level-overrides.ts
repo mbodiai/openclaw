@@ -11,11 +11,11 @@ export function parseVerboseOverride(
     return { ok: true, value: undefined };
   }
   if (typeof raw !== "string") {
-    return { ok: false, error: 'invalid verboseLevel (use "on"|"off")' };
+    return { ok: false, error: 'invalid verboseLevel (use "on"|"off"|"full")' };
   }
   const normalized = normalizeVerboseLevel(raw);
   if (!normalized) {
-    return { ok: false, error: 'invalid verboseLevel (use "on"|"off")' };
+    return { ok: false, error: 'invalid verboseLevel (use "on"|"off"|"full")' };
   }
   return { ok: true, value: normalized };
 }
