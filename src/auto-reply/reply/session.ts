@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { isExplicitLevel as isExplicitSessionLevel } from "../../sessions/level-overrides.js";
+import fs from "node:fs";
 import path from "node:path";
 import {
   buildTelegramTopicConversationId,
@@ -409,9 +411,11 @@ export async function initSessionState(params: {
     // user-set behavior overrides (verbose, thinking, reasoning, ttsAuto)
     // so the user doesn't have to re-enable them every time.
     if (resetTriggered && entry) {
-      persistedThinking = entry.thinkingLevel;
-      persistedVerbose = entry.verboseLevel;
-      persistedReasoning = entry.reasoningLevel;
+      // Only carry forward explicitly user-set levels; non-explicit ones
+      // will fall through to config defaults in the new session.
+      persistedThinking = isExplicitSessionLevel(entry, "thinking") ? entry.thinkingLevel : undefined;
+      persistedVerbose = isExplicitSessionLevel(entry, "verbose") ? entry.verboseLevel : undefined;
+      persistedReasoning = isExplicitSessionLevel(entry, "reasoning") ? entry.reasoningLevel : undefined;
       persistedTtsAuto = entry.ttsAuto;
       persistedModelOverride = entry.modelOverride;
       persistedProviderOverride = entry.providerOverride;
@@ -458,10 +462,18 @@ export async function initSessionState(params: {
     updatedAt: Date.now(),
     systemSent,
     abortedLastRun,
-    // Persist previously stored thinking/verbose levels when present.
-    thinkingLevel: persistedThinking ?? baseEntry?.thinkingLevel,
-    verboseLevel: persistedVerbose ?? baseEntry?.verboseLevel,
-    reasoningLevel: persistedReasoning ?? baseEntry?.reasoningLevel,
+    // Only carry forward levels that were explicitly set by user command.
+    // Non-explicit levels fall through to config defaults at resolution time.
+    thinkingLevel: isExplicitSessionLevel(baseEntry, "thinking")
+      ? (persistedThinking ?? baseEntry?.thinkingLevel)
+      : undefined,
+    verboseLevel: isExplicitSessionLevel(baseEntry, "verbose")
+      ? (persistedVerbose ?? baseEntry?.verboseLevel)
+      : undefined,
+    reasoningLevel: isExplicitSessionLevel(baseEntry, "reasoning")
+      ? (persistedReasoning ?? baseEntry?.reasoningLevel)
+      : undefined,
+    explicitLevels: baseEntry?.explicitLevels,
     ttsAuto: persistedTtsAuto ?? baseEntry?.ttsAuto,
     responseUsage: baseEntry?.responseUsage,
     modelOverride: persistedModelOverride ?? baseEntry?.modelOverride,
