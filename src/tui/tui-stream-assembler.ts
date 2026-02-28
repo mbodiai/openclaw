@@ -100,6 +100,25 @@ function shouldPreserveBoundaryDroppedText(params: {
   });
 }
 
+function shouldAppendPostBoundaryContinuation(params: {
+  boundaryDropMode: BoundaryDropMode;
+  streamedSawNonTextContentBlocks: boolean;
+  incomingSawNonTextContentBlocks: boolean;
+  streamedTextBlocks: string[];
+  nextContentBlocks: string[];
+}) {
+  if (params.boundaryDropMode !== "streamed-or-incoming") {
+    return false;
+  }
+  if (!params.streamedSawNonTextContentBlocks && !params.incomingSawNonTextContentBlocks) {
+    return false;
+  }
+  if (params.streamedTextBlocks.length === 0 || params.nextContentBlocks.length === 0) {
+    return false;
+  }
+  return params.nextContentBlocks.every((block) => !params.streamedTextBlocks.includes(block));
+}
+
 export class TuiStreamAssembler {
   private runs = new Map<string, RunStreamState>();
 
@@ -141,8 +160,18 @@ export class TuiStreamAssembler {
         streamedTextBlocks: state.contentBlocks,
         nextContentBlocks,
       });
+      const shouldAppendContinuation = shouldAppendPostBoundaryContinuation({
+        boundaryDropMode,
+        streamedSawNonTextContentBlocks: state.sawNonTextContentBlocks,
+        incomingSawNonTextContentBlocks: sawNonTextContentBlocks,
+        streamedTextBlocks: state.contentBlocks,
+        nextContentBlocks,
+      });
 
-      if (!shouldKeepStreamedBoundaryText) {
+      if (shouldAppendContinuation) {
+        state.contentBlocks = [...state.contentBlocks, ...nextContentBlocks];
+        state.contentText = state.contentBlocks.join("\n");
+      } else if (!shouldKeepStreamedBoundaryText) {
         state.contentText = contentText;
         state.contentBlocks = nextContentBlocks;
       }
