@@ -107,6 +107,53 @@ describe("TuiStreamAssembler", () => {
     expect(second).toBeNull();
   });
 
+  it("appends post-tool continuation text instead of erasing pre-tool text", () => {
+    const assembler = new TuiStreamAssembler();
+
+    const first = assembler.ingestDelta(
+      "run-post-tool",
+      messageWithContent([text("Before tool call")]),
+      false,
+    );
+    expect(first).toBe("Before tool call");
+
+    const boundary = assembler.ingestDelta(
+      "run-post-tool",
+      messageWithContent([toolUse(), text("After tool call")]),
+      false,
+    );
+    expect(boundary).toBe("Before tool call\nAfter tool call");
+  });
+
+  it("keeps appended post-tool continuation on repeated deltas", () => {
+    const assembler = new TuiStreamAssembler();
+
+    assembler.ingestDelta(
+      "run-post-tool-repeat",
+      messageWithContent([text("Before tool call")]),
+      false,
+    );
+    assembler.ingestDelta(
+      "run-post-tool-repeat",
+      messageWithContent([toolUse(), text("After tool call")]),
+      false,
+    );
+
+    const repeated = assembler.ingestDelta(
+      "run-post-tool-repeat",
+      messageWithContent([text("After tool call")]),
+      false,
+    );
+    expect(repeated).toBeNull();
+
+    const finalText = assembler.finalize(
+      "run-post-tool-repeat",
+      messageWithContent([text("Before tool call"), text("After tool call")]),
+      false,
+    );
+    expect(finalText).toBe("Before tool call\nAfter tool call");
+  });
+
   for (const testCase of FINALIZE_BOUNDARY_CASES) {
     it(testCase.name, () => {
       const assembler = new TuiStreamAssembler();
