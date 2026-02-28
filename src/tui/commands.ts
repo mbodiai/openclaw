@@ -3,7 +3,7 @@ import { listChatCommands, listChatCommandsForConfig } from "../auto-reply/comma
 import { formatThinkingLevels, listThinkingLevelLabels } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/types.js";
 
-const VERBOSE_LEVELS = ["on", "off"];
+const VERBOSE_LEVELS = ["on", "off", "full"];
 const FAST_LEVELS = ["status", "on", "off"];
 const REASONING_LEVELS = ["on", "off", "stream"];
 const ELEVATED_LEVELS = ["on", "off", "ask", "full"];
