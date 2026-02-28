@@ -306,6 +306,8 @@ export function createSessionActions(context: SessionActionContext) {
       chatLog.clearAll();
       btw.clear();
       chatLog.addSystem(`session ${state.currentSessionKey}`);
+      // Collect tool call args from assistant messages so toolResult can display them.
+      const toolCallArgs = new Map<string, { name: string; args: unknown }>();
       for (const entry of record.messages ?? []) {
         if (!entry || typeof entry !== "object") {
           continue;
@@ -332,6 +334,24 @@ export function createSessionActions(context: SessionActionContext) {
           if (text) {
             chatLog.finalizeAssistant(text);
           }
+          // Extract tool call args for later toolResult rendering.
+          const content = Array.isArray(message.content) ? message.content : [];
+          for (const part of content) {
+            if (
+              part &&
+              typeof part === "object" &&
+              (part as Record<string, unknown>).type === "toolCall"
+            ) {
+              const tc = part as Record<string, unknown>;
+              const id = typeof tc.id === "string" ? tc.id : "";
+              if (id) {
+                toolCallArgs.set(id, {
+                  name: typeof tc.name === "string" ? tc.name : "tool",
+                  args: tc.arguments ?? tc.args ?? {},
+                });
+              }
+            }
+          }
           continue;
         }
         if (message.role === "toolResult") {
@@ -340,7 +360,9 @@ export function createSessionActions(context: SessionActionContext) {
           }
           const toolCallId = asString(message.toolCallId, "");
           const toolName = asString(message.toolName, "tool");
-          const component = chatLog.startTool(toolCallId, toolName, {});
+          const saved = toolCallArgs.get(toolCallId);
+          const args = saved?.args ?? {};
+          const component = chatLog.startTool(toolCallId, toolName, args);
           component.setResult(
             {
               content: Array.isArray(message.content)
