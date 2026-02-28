@@ -21,16 +21,16 @@ export async function resolveCurrentDirectiveLevels(params: {
   currentElevatedLevel: ElevatedLevel | undefined;
 }> {
   const resolvedDefaultThinkLevel =
-    (params.sessionEntry?.thinkingLevel as ThinkLevel | undefined) ??
     (params.agentCfg?.thinkingDefault as ThinkLevel | undefined) ??
+    (params.sessionEntry?.thinkingLevel as ThinkLevel | undefined) ??
     (await params.resolveDefaultThinkingLevel());
   const currentThinkLevel = resolvedDefaultThinkLevel;
   const currentVerboseLevel =
-    (params.sessionEntry?.verboseLevel as VerboseLevel | undefined) ??
-    (params.agentCfg?.verboseDefault as VerboseLevel | undefined);
+    (params.agentCfg?.verboseDefault as VerboseLevel | undefined) ??
+    (params.sessionEntry?.verboseLevel as VerboseLevel | undefined);
   const currentReasoningLevel =
-    (params.sessionEntry?.reasoningLevel as ReasoningLevel | undefined) ??
     (params.agentCfg?.reasoningDefault as ReasoningLevel | undefined) ??
+    (params.sessionEntry?.reasoningLevel as ReasoningLevel | undefined) ??
     "off";
   const currentElevatedLevel =
     (params.sessionEntry?.elevatedLevel as ElevatedLevel | undefined) ??
