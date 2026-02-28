@@ -104,6 +104,8 @@ export type SessionEntry = {
   verboseLevel?: string;
   reasoningLevel?: string;
   elevatedLevel?: string;
+  /** Tracks which levels were explicitly set by user command (vs inherited from defaults). */
+  explicitLevels?: string[];
   ttsAuto?: TtsAutoMode;
   execHost?: string;
   execSecurity?: string;

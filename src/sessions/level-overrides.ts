@@ -26,7 +26,23 @@ export function applyVerboseOverride(entry: SessionEntry, level: VerboseLevel | 
   }
   if (level === null) {
     delete entry.verboseLevel;
+    markExplicitLevel(entry, "verbose", false);
     return;
   }
   entry.verboseLevel = level;
+  markExplicitLevel(entry, "verbose", true);
+}
+
+export function markExplicitLevel(entry: SessionEntry, key: string, explicit: boolean) {
+  const set = new Set(entry.explicitLevels ?? []);
+  if (explicit) {
+    set.add(key);
+  } else {
+    set.delete(key);
+  }
+  entry.explicitLevels = set.size > 0 ? [...set] : undefined;
+}
+
+export function isExplicitLevel(entry: SessionEntry | undefined, key: string): boolean {
+  return entry?.explicitLevels?.includes(key) ?? false;
 }
