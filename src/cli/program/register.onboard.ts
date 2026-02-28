@@ -184,10 +184,10 @@ export function registerOnboardCommand(program: Command) {
           customProviderId: opts.customProviderId as string | undefined,
           customCompatibility: opts.customCompatibility as "openai" | "anthropic" | undefined,
           customContextWindow: opts.customContextWindow
-            ? Number.parseInt(opts.customContextWindow as string, 10)
+            ? Number(opts.customContextWindow as string)
             : undefined,
           customMaxTokens: opts.customMaxTokens
-            ? Number.parseInt(opts.customMaxTokens as string, 10)
+            ? Number(opts.customMaxTokens as string)
             : undefined,
           gatewayPort:
             typeof gatewayPort === "number" && Number.isFinite(gatewayPort)
