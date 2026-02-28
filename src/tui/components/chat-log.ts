@@ -51,6 +51,14 @@ export class ChatLog extends Container {
     this.streamingRuns.clear();
   }
 
+  refreshAssistantMessages() {
+    for (const child of this.children) {
+      if (child instanceof AssistantMessageComponent) {
+        child.refresh();
+      }
+    }
+  }
+
   addSystem(text: string) {
     this.append(new Spacer(1));
     this.append(new Text(theme.system(text), 1, 0));
