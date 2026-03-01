@@ -13,7 +13,8 @@ import type { RuntimeEnv } from "../../../src/runtime.js";
 import { withTelegramApiErrorLogging } from "./api-logging.js";
 
 export const TELEGRAM_MAX_COMMANDS = 100;
-const TELEGRAM_COMMAND_RETRY_RATIO = 0.8;
+const TELEGRAM_COMMAND_ACCEPTANCE_LOG_PREFIX =
+  "Reduce plugin/skill/custom commands to expose more menu entries.";
 
 export type TelegramMenuCommand = {
   command: string;
@@ -50,7 +51,7 @@ function isBotCommandsTooMuchError(err: unknown): boolean {
   return false;
 }
 
-function formatTelegramCommandRetrySuccessLog(params: {
+function formatTelegramCommandAcceptanceLog(params: {
   initialCount: number;
   acceptedCount: number;
 }): string {
@@ -58,7 +59,7 @@ function formatTelegramCommandRetrySuccessLog(params: {
   return (
     `Telegram accepted ${params.acceptedCount} commands after BOT_COMMANDS_TOO_MUCH ` +
     `(started with ${params.initialCount}; omitted ${omittedCount}). ` +
-    "Reduce plugin/skill/custom commands to expose more menu entries."
+    TELEGRAM_COMMAND_ACCEPTANCE_LOG_PREFIX
   );
 }
 
@@ -207,44 +208,78 @@ export function syncTelegramMenuCommands(params: {
       return;
     }
 
-    let retryCommands = commandsToRegister;
+    // Binary search for the maximum number of commands Telegram will accept.
     const initialCommandCount = commandsToRegister.length;
-    while (retryCommands.length > 0) {
+    let lo = 1;
+    let hi = commandsToRegister.length;
+    let lastAccepted = 0;
+
+    // Try the full set first.
+    try {
+      await withTelegramApiErrorLogging({
+        operation: "setMyCommands",
+        runtime,
+        shouldLog: (err) => !isBotCommandsTooMuchError(err),
+        fn: () => bot.api.setMyCommands(commandsToRegister),
+      });
+      await writeCachedCommandHash(accountId, botIdentity, currentHash);
+      return; // All commands accepted.
+    } catch (err) {
+      if (!isBotCommandsTooMuchError(err)) {
+        throw err;
+      }
+      hi = commandsToRegister.length - 1;
+    }
+
+    // Binary search: find the highest count Telegram accepts.
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (mid <= 0) {
+        break;
+      }
       try {
         await withTelegramApiErrorLogging({
           operation: "setMyCommands",
           runtime,
           shouldLog: (err) => !isBotCommandsTooMuchError(err),
-          fn: () => bot.api.setMyCommands(retryCommands),
+          fn: () => bot.api.setMyCommands(commandsToRegister.slice(0, mid)),
         });
-        if (retryCommands.length < initialCommandCount) {
-          runtime.log?.(
-            formatTelegramCommandRetrySuccessLog({
-              initialCount: initialCommandCount,
-              acceptedCount: retryCommands.length,
-            }),
-          );
-        }
-        await writeCachedCommandHash(accountId, botIdentity, currentHash);
-        return;
+        lastAccepted = mid;
+        lo = mid + 1;
       } catch (err) {
         if (!isBotCommandsTooMuchError(err)) {
           throw err;
         }
-        const nextCount = Math.floor(retryCommands.length * TELEGRAM_COMMAND_RETRY_RATIO);
-        const reducedCount =
-          nextCount < retryCommands.length ? nextCount : retryCommands.length - 1;
-        if (reducedCount <= 0) {
-          runtime.error?.(
-            "Telegram rejected native command registration (BOT_COMMANDS_TOO_MUCH); leaving menu empty. Reduce commands or disable channels.telegram.commands.native.",
-          );
-          return;
-        }
-        runtime.log?.(
-          `Telegram rejected ${retryCommands.length} commands (BOT_COMMANDS_TOO_MUCH); retrying with ${reducedCount}.`,
-        );
-        retryCommands = retryCommands.slice(0, reducedCount);
+        hi = mid - 1;
       }
+    }
+
+    if (lastAccepted > 0) {
+      // Re-register with the best count found (last successful attempt may have been
+      // overwritten by a failed higher attempt — Telegram deletes on failed set).
+      if (lastAccepted < commandsToRegister.length) {
+        try {
+          await withTelegramApiErrorLogging({
+            operation: "setMyCommands",
+            runtime,
+            shouldLog: (err) => !isBotCommandsTooMuchError(err),
+            fn: () => bot.api.setMyCommands(commandsToRegister.slice(0, lastAccepted)),
+          });
+        } catch {
+          // Best-effort; the last successful setMyCommands should still be active.
+        }
+      }
+      await writeCachedCommandHash(accountId, botIdentity, currentHash);
+      runtime.log?.(
+        formatTelegramCommandAcceptanceLog({
+          initialCount: initialCommandCount,
+          acceptedCount: lastAccepted,
+        }),
+      );
+    } else {
+      runtime.error?.(
+        "Telegram rejected native command registration (BOT_COMMANDS_TOO_MUCH); leaving menu empty. Reduce commands or disable channels.telegram.commands.native.",
+      );
     }
   };
 
