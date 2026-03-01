@@ -63,14 +63,11 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: echo "Approved Docker backfill for $RELEASE_TAG"
 
-  # KEEP THIS WORKFLOW ON GITHUB-HOSTED RUNNERS.
-  # DO NOT MOVE IT BACK TO BLACKSMITH WITHOUT RE-VALIDATING TAG BUILDS AND BACKFILLS.
   # Build amd64 images (default + slim share the build stage cache)
   build-amd64:
     needs: [approve_manual_backfill]
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || needs.approve_manual_backfill.result == 'success') }}
-    # WARNING: DO NOT REVERT THIS TO A BLACKSMITH RUNNER WITHOUT RE-VALIDATING TAG BACKFILLS.
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       packages: write
       contents: read
@@ -182,8 +179,7 @@ jobs:
   build-arm64:
     needs: [approve_manual_backfill]
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || needs.approve_manual_backfill.result == 'success') }}
-    # WARNING: DO NOT REVERT THIS TO A BLACKSMITH RUNNER WITHOUT RE-VALIDATING TAG BACKFILLS.
-    runs-on: ubuntu-24.04-arm
+    runs-on: blacksmith-16vcpu-ubuntu-2404-arm
     permissions:
       packages: write
       contents: read
@@ -295,8 +291,7 @@ jobs:
   create-manifest:
     needs: [approve_manual_backfill, build-amd64, build-arm64]
     if: ${{ always() && needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success' && (github.event_name != 'workflow_dispatch' || needs.approve_manual_backfill.result == 'success') }}
-    # WARNING: DO NOT REVERT THIS TO A BLACKSMITH RUNNER WITHOUT RE-VALIDATING TAG BACKFILLS.
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       packages: write
       contents: read
