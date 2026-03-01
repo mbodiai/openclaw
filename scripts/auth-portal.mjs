@@ -73,44 +73,47 @@ async function provisionFlyMachine(config, userId) {
     }
   } else {
     gatewayToken = crypto.randomBytes(16).toString("hex");
+
+    const machineConfig = {
+      image: config.image,
+      env: {
+        OPENCLAW_GATEWAY_TOKEN: gatewayToken,
+        OPENCLAW_WORKSPACE_DIR: "/home/node/.openclaw/workspace",
+      },
+      mounts: [{ volume: vol.id, path: "/home/node/.openclaw/workspace" }],
+      services: [
+        {
+          protocol: "tcp",
+          internal_port: 18789,
+          ports: [
+            { port: 443, handlers: ["tls", "http"] },
+            { port: 80, handlers: ["http"] },
+          ],
+          autostart: true,
+          autostop: "suspend",
+          min_machines_running: 0,
+        },
+      ],
+      processes: [
+        {
+          name: "app",
+          entrypoint: ["node", "dist/index.js", "gateway", "--bind", "0.0.0.0", "--port", "18789"],
+        },
+      ],
+    };
+
+    if (config.ghcrUsername && config.ghcrPat) {
+      machineConfig.image_ref = {
+        registry: "ghcr.io",
+        username: config.ghcrUsername,
+        password: config.ghcrPat,
+      };
+    }
+
     machine = await flyApi(config, "POST", "/machines", {
       name: machineName,
       region: config.region,
-      config: {
-        image: config.image,
-        env: {
-          OPENCLAW_GATEWAY_TOKEN: gatewayToken,
-          OPENCLAW_WORKSPACE_DIR: "/home/node/.openclaw/workspace",
-        },
-        mounts: [{ volume: vol.id, path: "/home/node/.openclaw/workspace" }],
-        services: [
-          {
-            protocol: "tcp",
-            internal_port: 18789,
-            ports: [
-              { port: 443, handlers: ["tls", "http"] },
-              { port: 80, handlers: ["http"] },
-            ],
-            autostart: true,
-            autostop: "suspend",
-            min_machines_running: 0,
-          },
-        ],
-        processes: [
-          {
-            name: "app",
-            entrypoint: [
-              "node",
-              "dist/index.js",
-              "gateway",
-              "--bind",
-              "0.0.0.0",
-              "--port",
-              "18789",
-            ],
-          },
-        ],
-      },
+      config: machineConfig,
     });
   }
 
@@ -725,6 +728,8 @@ const server = http.createServer(async (req, res) => {
           orgSlug: flyOrgSlug,
           region: flyRegion,
           image: flyImage,
+          ghcrUsername: process.env.GHCR_USERNAME?.trim(),
+          ghcrPat: process.env.GHCR_PAT?.trim(),
         };
         const sanitizedId = userRes.user.id.replace(/-/g, "").substring(0, 16);
         const result = await provisionFlyMachine(flyConfig, sanitizedId);
