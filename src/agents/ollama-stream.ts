@@ -459,14 +459,17 @@ function formatOllamaTransportError(params: { attemptedUrls: string[]; error: un
           (cause as { errno?: unknown }).errno,
           (cause as { message?: unknown }).message,
         ]
-          .filter((part): part is string | number => typeof part === "string" || typeof part === "number")
+          .filter(
+            (part): part is string | number => typeof part === "string" || typeof part === "number",
+          )
           .map((part) => String(part))
           .join(" ")
       : undefined;
-  const detail = [err.message?.trim(), causeText?.trim()].filter(Boolean).join(" | ") || String(err);
+  const detail =
+    [err.message?.trim(), causeText?.trim()].filter(Boolean).join(" | ") || String(err);
   const tried = params.attemptedUrls.join(" -> ");
-  const localhostHint = params.attemptedUrls.some((url) =>
-    url.startsWith("http://127.0.0.1:") || url.startsWith("http://localhost:"),
+  const localhostHint = params.attemptedUrls.some(
+    (url) => url.startsWith("http://127.0.0.1:") || url.startsWith("http://localhost:"),
   )
     ? " If Ollama runs in another network namespace (Windows host vs WSL/Docker), set models.providers.<provider>.baseUrl to a reachable host/IP."
     : "";
