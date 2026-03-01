@@ -37,7 +37,7 @@ async function ensureFlyApp(config) {
         Authorization: `Bearer ${config.token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ app_name: config.appName, org_slug: "personal" }),
+      body: JSON.stringify({ app_name: config.appName, org_slug: config.orgSlug }),
     });
     if (!res.ok) {
       throw new Error("Failed to create Fly app: " + (await res.text()));
@@ -706,11 +706,25 @@ const server = http.createServer(async (req, res) => {
 
       const flyToken = process.env.FLY_API_TOKEN?.trim();
       if (flyToken) {
+        const flyAppName = process.env.FLY_APP_NAME?.trim();
+        const flyOrgSlug = process.env.FLY_ORG_SLUG?.trim();
+        const flyRegion = process.env.FLY_REGION?.trim();
+        const flyImage = process.env.OPENCLAW_IMAGE?.trim();
+
+        if (!flyAppName || !flyOrgSlug || !flyRegion || !flyImage) {
+          writeJson(res, 500, {
+            error:
+              "Fly.io provisioning is enabled (FLY_API_TOKEN is set) but missing required env vars: FLY_APP_NAME, FLY_ORG_SLUG, FLY_REGION, or OPENCLAW_IMAGE.",
+          });
+          return;
+        }
+
         const flyConfig = {
           token: flyToken,
-          appName: process.env.FLY_APP_NAME?.trim() || "openclaw-workspaces",
-          region: process.env.FLY_REGION?.trim() || "iad",
-          image: process.env.OPENCLAW_IMAGE?.trim() || "ghcr.io/mbodi/openclaw:latest",
+          appName: flyAppName,
+          orgSlug: flyOrgSlug,
+          region: flyRegion,
+          image: flyImage,
         };
         const sanitizedId = userRes.user.id.replace(/-/g, "").substring(0, 16);
         const result = await provisionFlyMachine(flyConfig, sanitizedId);
@@ -750,7 +764,11 @@ server.on("upgrade", (req, socket, head) => {
   }
   const machineId = match[1];
 
-  const appName = process.env.FLY_APP_NAME?.trim() || "openclaw-workspaces";
+  const appName = process.env.FLY_APP_NAME?.trim();
+  if (!appName) {
+    socket.destroy();
+    return;
+  }
   const flyProxyHost = `${appName}.fly.dev`;
 
   const target = tls.connect(443, flyProxyHost, () => {
