@@ -17,7 +17,11 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { getSlashCommands } from "./commands.js";
-import { setThinkingExpandedView, setThinkingVisibleView, setVerboseFullMode } from "./components/assistant-message.js";
+import {
+  setThinkingExpandedView,
+  setThinkingVisibleView,
+  setVerboseFullMode,
+} from "./components/assistant-message.js";
 import { ChatLog } from "./components/chat-log.js";
 import { CustomEditor } from "./components/custom-editor.js";
 import { GatewayChatClient } from "./gateway-chat.js";
@@ -663,9 +667,7 @@ export async function runTui(opts: TuiOptions) {
       const budget = Math.max(40, cols - overhead - 4);
       const normalized = preview.replace(/\s+/g, " ");
       const truncated =
-        normalized.length <= budget
-          ? normalized
-          : `…${normalized.slice(-(budget - 1))}`;
+        normalized.length <= budget ? normalized : `…${normalized.slice(-(budget - 1))}`;
       parts.push(`thinking ... ${truncated}`);
     }
     return parts.join(" | ");
@@ -716,7 +718,9 @@ export async function runTui(opts: TuiOptions) {
       return;
     }
 
-    statusLoader.setMessage(statusWithContext(`${activityStatus} • ${elapsed} | ${connectionStatus}`));
+    statusLoader.setMessage(
+      statusWithContext(`${activityStatus} • ${elapsed} | ${connectionStatus}`),
+    );
   };
 
   const startStatusTimer = () => {
@@ -942,24 +946,24 @@ export async function runTui(opts: TuiOptions) {
 
   const { handleChatEvent, handleAgentEvent, handleBtwEvent, drainPendingAgentEvents, resetAgentEventBuffer } =
     createEventHandlers({
-    chatLog,
-    btw,
-    tui,
-    state,
-    setActivityStatus,
-    refreshSessionInfo,
-    loadHistory,
-    isLocalRunId,
-    forgetLocalRunId,
-    clearLocalRunIds,
-    isLocalBtwRunId,
-    forgetLocalBtwRunId,
-    clearLocalBtwRunIds,
-    onRunSettled: () => {
-      void flushQueuedMessage();
-    },
-    setThinkingPreview,
-    setActiveToolName,
+      chatLog,
+      btw,
+      tui,
+      state,
+      setActivityStatus,
+      refreshSessionInfo,
+      loadHistory,
+      isLocalRunId,
+      forgetLocalRunId,
+      clearLocalRunIds,
+      isLocalBtwRunId,
+      forgetLocalBtwRunId,
+      clearLocalBtwRunIds,
+      onRunSettled: () => {
+        void flushQueuedMessage();
+      },
+      setThinkingPreview,
+      setActiveToolName,
     });
 
   // Wire the late-binding drain reference now that event handlers exist.
