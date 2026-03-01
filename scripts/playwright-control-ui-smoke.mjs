@@ -11,7 +11,9 @@ const SCREENSHOT_DIR =
 const PROFILE_DIR =
   process.env.OPENCLAW_PLAYWRIGHT_PROFILE_DIR?.trim() || "ui/test-results/chat.mbodi.ai.profile";
 const IMAGE_PATH = process.env.OPENCLAW_CHAT_IMAGE?.trim() || "ui/public/favicon-32.png";
-const CHAT_MESSAGE = process.env.OPENCLAW_CHAT_MESSAGE?.trim() || "Playwright smoke test";
+const CHAT_MESSAGE =
+  process.env.OPENCLAW_CHAT_MESSAGE?.trim() ||
+  `Playwright smoke test (${new Date().toISOString()})`;
 
 const CHROME_EXECUTABLE =
   process.env.PLAYWRIGHT_CHROME_EXECUTABLE?.trim() ||
@@ -26,10 +28,37 @@ function resolveUrl(pathname) {
   return new URL(pathname, CONTROL_UI_URL).toString();
 }
 
+function resolveAuthedUrl(pathname) {
+  const url = new URL(resolveUrl(pathname));
+  url.searchParams.set("token", GATEWAY_TOKEN);
+  return url.toString();
+}
+
 async function screenshot(page, name) {
   const filePath = path.join(SCREENSHOT_DIR, name);
   await page.screenshot({ path: filePath, fullPage: true });
   return filePath;
+}
+
+async function waitForChatReady(page) {
+  const textarea = page.locator(".chat-compose textarea");
+  await textarea.waitFor({ state: "visible", timeout: 15000 });
+
+  const danger = page.locator(".callout.danger").first();
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < 15000) {
+    if (await textarea.isEnabled()) {
+      return { ok: true };
+    }
+    if (await danger.isVisible().catch(() => false)) {
+      const message = await danger.innerText().catch(() => "");
+      return { ok: false, message };
+    }
+    await page.waitForTimeout(200);
+  }
+
+  return { ok: false, message: "Timeout waiting for Control UI to connect." };
 }
 
 async function main() {
@@ -44,34 +73,17 @@ async function main() {
 
   try {
     const page = await context.newPage();
-    await page.goto(CONTROL_UI_URL, { waitUntil: "domcontentloaded" });
+    // Avoid triggering failed-auth rate limiting: hydrate token from URL on first load.
+    await page.goto(resolveAuthedUrl("/"), { waitUntil: "domcontentloaded" });
+
+    const ready = await waitForChatReady(page);
     await page.waitForTimeout(300);
+    await screenshot(page, "01-main.png");
 
-    await screenshot(page, "01-chat-initial.png");
-
-    await page.goto(resolveUrl("/overview"), { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(300);
-    await screenshot(page, "02-overview.png");
-
-    await page.locator('input[placeholder="OPENCLAW_GATEWAY_TOKEN"]').fill(GATEWAY_TOKEN);
-    await page.getByRole("button", { name: /connect/i }).click();
-
-    const connected = page.locator(".stat-value.ok");
-    const danger = page.locator(".callout.danger");
-
-    const outcome = await Promise.race([
-      connected.waitFor({ timeout: 15000 }).then(() => "connected"),
-      danger.waitFor({ timeout: 15000 }).then(() => "error"),
-    ]).catch(() => "timeout");
-
-    await page.waitForTimeout(300);
-    await screenshot(page, "03-overview-after-connect.png");
-
-    if (outcome !== "connected") {
-      const errText = await danger.innerText().catch(() => "");
+    if (!ready.ok) {
       console.error("Control UI is not connected.");
-      if (errText) {
-        console.error(errText);
+      if (ready.message) {
+        console.error(ready.message);
       }
       console.error(
         `If you see "pairing required", approve the device then rerun:\n` +
@@ -80,18 +92,16 @@ async function main() {
       process.exit(2);
     }
 
-    await page.goto(resolveUrl("/chat"), { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(300);
-    await screenshot(page, "04-chat.png");
-
     await page.locator('input[type="file"][accept="image/*"]').setInputFiles(IMAGE_PATH);
     await page.waitForSelector(".chat-attachments img.chat-attachment__img", { timeout: 5000 });
-    await screenshot(page, "05-chat-attachment.png");
+    await screenshot(page, "02-attachment.png");
 
     await page.locator(".chat-compose textarea").fill(CHAT_MESSAGE);
     await page.locator(".chat-compose__actions .btn.primary").click();
-    await page.waitForTimeout(600);
-    await screenshot(page, "06-chat-sent.png");
+    await page.locator(".chat-thread").getByText(CHAT_MESSAGE).waitFor({ timeout: 5000 });
+    await page.waitForSelector(".chat-message-images img.chat-message-image", { timeout: 5000 });
+    await page.waitForTimeout(300);
+    await screenshot(page, "03-sent.png");
   } finally {
     await context.close();
   }
