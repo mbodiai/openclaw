@@ -162,6 +162,51 @@ function generateAttachmentId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Failed to read file (unexpected result type)."));
+    });
+    reader.addEventListener("error", () =>
+      reject(reader.error ?? new Error("Failed to read file")),
+    );
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addImageFilesAsAttachments(files: File[], props: ChatProps) {
+  if (!props.onAttachmentsChange) {
+    return;
+  }
+  const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+  if (imageFiles.length === 0) {
+    return;
+  }
+  const current = props.attachments ?? [];
+  const next: ChatAttachment[] = [];
+  for (const file of imageFiles) {
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      next.push({
+        id: generateAttachmentId(),
+        dataUrl,
+        mimeType: file.type,
+      });
+    } catch {
+      // Best-effort; skip unreadable files.
+    }
+  }
+  if (next.length === 0) {
+    return;
+  }
+  props.onAttachmentsChange([...current, ...next]);
+}
+
 function handlePaste(e: ClipboardEvent, props: ChatProps) {
   const items = e.clipboardData?.items;
   if (!items || !props.onAttachmentsChange) {
@@ -253,8 +298,10 @@ export function renderChat(props: ChatProps) {
   const composePlaceholder = props.connected
     ? hasAttachments
       ? "Add a message or paste more images..."
-      : "Message (↩ to send, Shift+↩ for line breaks, paste images)"
+      : "Message (↩ to send, Shift+↩ for line breaks, paste or attach images)"
     : "Connect to the gateway to start chatting…";
+
+  let imagePickerEl: HTMLInputElement | null = null;
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
@@ -458,6 +505,36 @@ export function renderChat(props: ChatProps) {
             ></textarea>
           </label>
           <div class="chat-compose__actions">
+            ${
+              props.onAttachmentsChange
+                ? html`
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style="display:none"
+                    ${ref((el) => {
+                      imagePickerEl = (el as HTMLInputElement | null) ?? null;
+                    })}
+                    @change=${(e: Event) => {
+                      const input = e.target as HTMLInputElement;
+                      const files = Array.from(input.files ?? []);
+                      input.value = "";
+                      void addImageFilesAsAttachments(files, props);
+                    }}
+                  />
+                  <button
+                    class="btn"
+                    type="button"
+                    ?disabled=${!props.connected}
+                    title="Attach image(s)"
+                    @click=${() => imagePickerEl?.click()}
+                  >
+                    ${icons.image} Attach
+                  </button>
+                `
+                : nothing
+            }
             <button
               class="btn"
               ?disabled=${!props.connected || (!canAbort && props.sending)}
