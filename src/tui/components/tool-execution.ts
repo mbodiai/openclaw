@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import chalk from "chalk";
 import { Box, Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import chalk from "chalk";
 import { formatToolDetail, resolveToolDisplay } from "../../agents/tool-display.js";
 import { markdownTheme, theme } from "../theme/theme.js";
 import { sanitizeRenderableText } from "../tui-formatters.js";
@@ -181,7 +181,7 @@ function formatEditDiff(args: unknown): string | null {
   const maxLine = startLine + Math.max(oldLines.length, newLines.length) - 1;
   const gutterWidth = startLine > 0 ? String(maxLine).length : 0;
   const pad = (n: number) => String(n).padStart(gutterWidth);
-  const gutter = (n: number) => startLine > 0 ? chalk.dim(`${pad(n)}│`) : "";
+  const gutter = (n: number) => (startLine > 0 ? chalk.dim(`${pad(n)}│`) : "");
 
   const parts: string[] = [];
   if (filePath) {
@@ -192,7 +192,9 @@ function formatEditDiff(args: unknown): string | null {
     parts.push(`${gutter(startLine + i)}${chalk.bgRgb(80, 20, 20).redBright(`- ${oldLines[i]}`)}`);
   }
   for (let i = 0; i < newLines.length; i++) {
-    parts.push(`${gutter(startLine + i)}${chalk.bgRgb(20, 60, 20).greenBright(`+ ${newLines[i]}`)}`);
+    parts.push(
+      `${gutter(startLine + i)}${chalk.bgRgb(20, 60, 20).greenBright(`+ ${newLines[i]}`)}`,
+    );
   }
   return parts.join("\n");
 }
@@ -298,8 +300,7 @@ export class ToolExecutionComponent extends Container {
     if (!this.expanded && text) {
       const lines = text.split("\n");
       const limit = diff ? PREVIEW_LINES * 2 : PREVIEW_LINES;
-      const preview =
-        lines.length > limit ? `${lines.slice(0, limit).join("\n")}\n…` : text;
+      const preview = lines.length > limit ? `${lines.slice(0, limit).join("\n")}\n…` : text;
       this.output.setText(preview);
     } else {
       this.output.setText(text);

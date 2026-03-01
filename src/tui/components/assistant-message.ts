@@ -22,7 +22,11 @@ function splitThinkingPrefix(text: string) {
 }
 
 function normalizeThinkingForUi(text: string) {
-  return text.replace(/\*\*/g, "").replace(/^\s*\*\s*/gm, "").replace(/\s+/g, " ").trim();
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/^\s*\*\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function compactThinkingForUi(text: string, maxLen = 300) {

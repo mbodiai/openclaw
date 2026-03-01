@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { isExplicitLevel as isExplicitSessionLevel } from "../../sessions/level-overrides.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -36,6 +35,7 @@ import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenanc
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
+import { isExplicitLevel as isExplicitSessionLevel } from "../../sessions/level-overrides.js";
 import {
   parseAgentSessionKey,
   isContaminatedSessionId,
@@ -422,9 +422,13 @@ export async function initSessionState(params: {
     if (resetTriggered && entry) {
       // Only carry forward explicitly user-set levels; non-explicit ones
       // will fall through to config defaults in the new session.
-      persistedThinking = isExplicitSessionLevel(entry, "thinking") ? entry.thinkingLevel : undefined;
+      persistedThinking = isExplicitSessionLevel(entry, "thinking")
+        ? entry.thinkingLevel
+        : undefined;
       persistedVerbose = isExplicitSessionLevel(entry, "verbose") ? entry.verboseLevel : undefined;
-      persistedReasoning = isExplicitSessionLevel(entry, "reasoning") ? entry.reasoningLevel : undefined;
+      persistedReasoning = isExplicitSessionLevel(entry, "reasoning")
+        ? entry.reasoningLevel
+        : undefined;
       persistedTtsAuto = entry.ttsAuto;
       persistedModelOverride = entry.modelOverride;
       persistedProviderOverride = entry.providerOverride;
