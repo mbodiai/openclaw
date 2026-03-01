@@ -204,7 +204,7 @@ function buildLoginHtml({ returnTo }) {
         const SUPABASE_URL = ${JSON.stringify(SUPABASE_URL)};
         const SUPABASE_ANON_KEY = ${JSON.stringify(SUPABASE_ANON_KEY)};
         const RETURN_TO = ${JSON.stringify(returnTo)};
-        const AUTH_CALLBACK = ${JSON.stringify("/callback")};
+        const AUTH_CALLBACK = ${JSON.stringify("/auth/callback")};
 
         const form = document.getElementById("form");
         const emailEl = document.getElementById("email");
@@ -254,7 +254,7 @@ function buildLoginHtml({ returnTo }) {
               "apikey": SUPABASE_ANON_KEY,
               "authorization": "Bearer " + SUPABASE_ANON_KEY
             },
-            body: JSON.stringify({ email, create_user: false })
+            body: JSON.stringify({ email, create_user: true })
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -439,7 +439,7 @@ function buildCallbackHtml() {
               "Missing access_token from Supabase callback. " +
                 "Check Supabase Auth settings: add " +
                 window.location.origin +
-                "/callback as an allowed redirect URL, then request a new sign-in link."
+                "/auth/callback as an allowed redirect URL, then request a new sign-in link."
             );
             return;
           }
@@ -543,7 +543,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/callback") {
+    if (req.method === "GET" && url.pathname === "/auth/callback") {
       const { html, csp } = buildCallbackHtml();
       writeResponse(
         res,
