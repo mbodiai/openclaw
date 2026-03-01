@@ -18,11 +18,13 @@ import {
 } from "./app-settings.ts";
 import { loadControlUiBootstrapConfig } from "./controllers/control-ui-bootstrap.ts";
 import type { Tab } from "./navigation.ts";
+import type { UiSettings } from "./storage.ts";
 
 type LifecycleHost = {
   basePath: string;
   client?: { stop: () => void } | null;
   connected?: boolean;
+  settings: UiSettings;
   tab: Tab;
   assistantName: string;
   assistantAvatar: string | null;
@@ -40,10 +42,64 @@ type LifecycleHost = {
   topbarObserver: ResizeObserver | null;
 };
 
+function shouldBypassAuthRedirect(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("noAuthRedirect");
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function resolveAuthPortalUrl(returnTo: string): string | null {
+  if (shouldBypassAuthRedirect()) {
+    return null;
+  }
+  if (window.location.protocol !== "https:") {
+    return null;
+  }
+  const host = window.location.host;
+  if (!host.startsWith("chat.")) {
+    return null;
+  }
+  const authHost = `auth.${host.slice("chat.".length)}`;
+  const authUrl = new URL(window.location.href);
+  authUrl.host = authHost;
+  authUrl.pathname = "/";
+  authUrl.search = "";
+  authUrl.hash = "";
+  authUrl.searchParams.set("returnTo", returnTo);
+  return authUrl.toString();
+}
+
+function maybeRedirectToAuthPortal(host: LifecycleHost): boolean {
+  const token = host.settings.token?.trim() ?? "";
+  if (token) {
+    return false;
+  }
+  const returnTo = new URL(window.location.href);
+  returnTo.searchParams.delete("token");
+  const hashParams = new URLSearchParams(
+    returnTo.hash.startsWith("#") ? returnTo.hash.slice(1) : "",
+  );
+  hashParams.delete("token");
+  returnTo.hash = hashParams.toString() ? `#${hashParams.toString()}` : "";
+  const redirectUrl = resolveAuthPortalUrl(returnTo.toString());
+  if (!redirectUrl) {
+    return false;
+  }
+  window.location.replace(redirectUrl);
+  return true;
+}
+
 export function handleConnected(host: LifecycleHost) {
   host.basePath = inferBasePath();
   void loadControlUiBootstrapConfig(host);
   applySettingsFromUrl(host as unknown as Parameters<typeof applySettingsFromUrl>[0]);
+  if (maybeRedirectToAuthPortal(host)) {
+    return;
+  }
   syncTabWithLocation(host as unknown as Parameters<typeof syncTabWithLocation>[0], true);
   syncThemeWithSettings(host as unknown as Parameters<typeof syncThemeWithSettings>[0]);
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
