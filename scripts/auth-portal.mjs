@@ -164,6 +164,17 @@ function buildLoginHtml({ returnTo }) {
         display: none;
         white-space: pre-wrap;
       }
+      .note {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #143044;
+        background: #071a26;
+        color: #b8e3ff;
+        font-size: 12px;
+        display: none;
+        white-space: pre-wrap;
+      }
       .meta { margin-top: 14px; font-size: 11px; color: #6b7f95; }
       code { color: #c9d7e3; }
     </style>
@@ -171,19 +182,16 @@ function buildLoginHtml({ returnTo }) {
   <body>
     <main>
       <h1>Sign in</h1>
-      <p>Sign in to fetch a gateway token, then you’ll be redirected back to Control UI.</p>
+      <p>We’ll email you a sign-in link, then you’ll be redirected back to Control UI.</p>
 
       <form id="form">
         <label>
           Email
           <input id="email" type="email" autocomplete="username" required />
         </label>
-        <label>
-          Password
-          <input id="password" type="password" autocomplete="current-password" required />
-        </label>
-        <button id="submit" type="submit">Sign in</button>
+        <button id="submit" type="submit">Send sign-in link</button>
         <div id="error" class="error"></div>
+        <div id="note" class="note"></div>
       </form>
 
       <div class="meta">
@@ -196,12 +204,15 @@ function buildLoginHtml({ returnTo }) {
         const SUPABASE_URL = ${JSON.stringify(SUPABASE_URL)};
         const SUPABASE_ANON_KEY = ${JSON.stringify(SUPABASE_ANON_KEY)};
         const RETURN_TO = ${JSON.stringify(returnTo)};
+        const AUTH_CALLBACK = ${JSON.stringify("/callback")};
 
         const form = document.getElementById("form");
         const emailEl = document.getElementById("email");
-        const passEl = document.getElementById("password");
         const submitEl = document.getElementById("submit");
         const errorEl = document.getElementById("error");
+        const noteEl = document.getElementById("note");
+
+        const STORAGE_KEY = "openclaw.auth.returnTo";
 
         function setError(message) {
           if (!message) {
@@ -209,35 +220,203 @@ function buildLoginHtml({ returnTo }) {
             errorEl.textContent = "";
             return;
           }
+          noteEl.style.display = "none";
+          noteEl.textContent = "";
           errorEl.style.display = "block";
           errorEl.textContent = message;
         }
 
-        async function signInWithPassword(email, password) {
+        function setNote(message) {
+          if (!message) {
+            noteEl.style.display = "none";
+            noteEl.textContent = "";
+            return;
+          }
+          errorEl.style.display = "none";
+          errorEl.textContent = "";
+          noteEl.style.display = "block";
+          noteEl.textContent = message;
+        }
+
+        function callbackUrl() {
+          const url = new URL(AUTH_CALLBACK, window.location.origin);
+          return url.toString();
+        }
+
+        async function requestMagicLink(email) {
           const base = SUPABASE_URL.replace(/\\/+$/, "");
-          const url = base + "/auth/v1/token?grant_type=password";
+          const url = new URL(base + "/auth/v1/otp");
+          url.searchParams.set("redirect_to", callbackUrl());
           const res = await fetch(url, {
             method: "POST",
             headers: {
               "content-type": "application/json",
-              "apikey": SUPABASE_ANON_KEY
+              "apikey": SUPABASE_ANON_KEY,
+              "authorization": "Bearer " + SUPABASE_ANON_KEY
             },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, create_user: false })
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
-            throw new Error(data.error_description || data.msg || ("Login failed (" + res.status + ")"));
+            throw new Error(
+              data.error_description || data.msg || data.error || ("Failed to send link (" + res.status + ")"),
+            );
           }
-          if (!data.access_token) {
-            throw new Error("Login succeeded but no access_token was returned.");
-          }
-          return data.access_token;
         }
 
-        async function fetchGatewayToken(accessToken) {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          setError("");
+          setNote("");
+
+          const email = (emailEl.value || "").trim();
+          if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            setError("Auth portal is missing SUPABASE_URL / SUPABASE_ANON_KEY.");
+            return;
+          }
+          if (!email) {
+            setError("Email is required.");
+            return;
+          }
+
+          submitEl.disabled = true;
+          submitEl.textContent = "Sending…";
+          try {
+            localStorage.setItem(STORAGE_KEY, RETURN_TO);
+            await requestMagicLink(email);
+            setNote("Check your email for the sign-in link, then open it to finish signing in.");
+          } catch (err) {
+            setError(String(err && err.message ? err.message : err));
+          } finally {
+            submitEl.disabled = false;
+            submitEl.textContent = "Send sign-in link";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>`;
+
+  return { html, csp };
+}
+
+function buildCallbackHtml() {
+  const allowedOrigins = [...ALLOWED_RETURN_ORIGINS];
+  const defaultReturnTo = `${DEFAULT_ALLOWED_RETURN_ORIGINS[0]}/`;
+
+  const csp = [
+    "default-src 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'none'",
+    "img-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline'",
+    "connect-src 'self'",
+  ].join("; ");
+
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Auth</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        background: #0b0f14;
+        color: #e6edf3;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+          "Apple Color Emoji", "Segoe UI Emoji";
+      }
+      main { max-width: 420px; margin: 0 auto; padding: 40px 16px; }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      .status { margin-top: 10px; color: #c9d7e3; font-size: 13px; }
+      .error {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #3b0a1a;
+        background: #240712;
+        color: #ff9aa8;
+        font-size: 12px;
+        white-space: pre-wrap;
+        display: none;
+      }
+      code { color: #c9d7e3; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Signing in…</h1>
+      <div class="status" id="status">Exchanging session for a gateway token.</div>
+      <div class="error" id="error"></div>
+    </main>
+
+    <script>
+      (() => {
+        const STORAGE_KEY = "openclaw.auth.returnTo";
+        const DEFAULT_RETURN_TO = ${JSON.stringify(defaultReturnTo)};
+        const ALLOWED_ORIGINS = ${JSON.stringify(allowedOrigins)};
+
+        const statusEl = document.getElementById("status");
+        const errorEl = document.getElementById("error");
+
+        function setError(message) {
+          errorEl.style.display = "block";
+          errorEl.textContent = message;
+          statusEl.textContent = "Could not complete sign-in.";
+        }
+
+        function safeOrigin(url) {
+          try {
+            return new URL(url).origin;
+          } catch {
+            return null;
+          }
+        }
+
+        function resolveReturnTo() {
+          const fromStorage = localStorage.getItem(STORAGE_KEY);
+          if (fromStorage) {
+            localStorage.removeItem(STORAGE_KEY);
+            const origin = safeOrigin(fromStorage);
+            if (origin && ALLOWED_ORIGINS.includes(origin)) {
+              return fromStorage;
+            }
+          }
+          return DEFAULT_RETURN_TO;
+        }
+
+        function accessTokenFromUrl() {
+          const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+          const hashParams = new URLSearchParams(hash);
+          const searchParams = new URLSearchParams(window.location.search);
+
+          const error =
+            hashParams.get("error_description") ||
+            searchParams.get("error_description") ||
+            hashParams.get("error") ||
+            searchParams.get("error");
+          if (error) {
+            return { error };
+          }
+
+          const accessToken =
+            hashParams.get("access_token") ||
+            searchParams.get("access_token") ||
+            hashParams.get("accessToken") ||
+            searchParams.get("accessToken") ||
+            "";
+
+          return { accessToken: accessToken.trim() };
+        }
+
+        async function exchange(accessToken) {
           const res = await fetch("/api/gateway-token", {
             method: "POST",
-            headers: { "authorization": "Bearer " + accessToken }
+            headers: { authorization: "Bearer " + accessToken }
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -249,42 +428,41 @@ function buildLoginHtml({ returnTo }) {
           return data.token;
         }
 
-        function redirectWithToken(token) {
-          const dest = new URL(RETURN_TO);
+        async function run() {
+          const { accessToken, error } = accessTokenFromUrl();
+          if (error) {
+            setError(String(error));
+            return;
+          }
+          if (!accessToken) {
+            setError(
+              "Missing access_token from Supabase callback. " +
+                "Check Supabase Auth settings: add " +
+                window.location.origin +
+                "/callback as an allowed redirect URL, then request a new sign-in link."
+            );
+            return;
+          }
+
+          // Strip Supabase tokens from the URL ASAP.
+          window.history.replaceState({}, "", window.location.pathname);
+
+          let gatewayToken;
+          try {
+            gatewayToken = await exchange(accessToken);
+          } catch (err) {
+            setError(String(err && err.message ? err.message : err));
+            return;
+          }
+
+          const dest = new URL(resolveReturnTo());
           const hash = new URLSearchParams(dest.hash.startsWith("#") ? dest.hash.slice(1) : "");
-          hash.set("token", token);
+          hash.set("token", gatewayToken);
           dest.hash = "#" + hash.toString();
           window.location.replace(dest.toString());
         }
 
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          setError("");
-
-          const email = (emailEl.value || "").trim();
-          const password = passEl.value || "";
-          if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-            setError("Auth portal is missing SUPABASE_URL / SUPABASE_ANON_KEY.");
-            return;
-          }
-          if (!email || !password) {
-            setError("Email and password are required.");
-            return;
-          }
-
-          submitEl.disabled = true;
-          submitEl.textContent = "Signing in…";
-          try {
-            const accessToken = await signInWithPassword(email, password);
-            const gatewayToken = await fetchGatewayToken(accessToken);
-            redirectWithToken(gatewayToken);
-          } catch (err) {
-            setError(String(err && err.message ? err.message : err));
-          } finally {
-            submitEl.disabled = false;
-            submitEl.textContent = "Sign in";
-          }
-        });
+        void run();
       })();
     </script>
   </body>
@@ -349,6 +527,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/") {
       const returnTo = resolveReturnTo(url.searchParams.get("returnTo"));
       const { html, csp } = buildLoginHtml({ returnTo });
+      writeResponse(
+        res,
+        200,
+        {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+          "referrer-policy": "no-referrer",
+          "x-frame-options": "DENY",
+          "content-security-policy": csp,
+        },
+        html,
+      );
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/callback") {
+      const { html, csp } = buildCallbackHtml();
       writeResponse(
         res,
         200,
