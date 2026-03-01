@@ -47,7 +47,11 @@ async function main() {
     await page.goto(CONTROL_UI_URL, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(300);
 
-    await screenshot(page, "01-overview.png");
+    await screenshot(page, "01-chat-initial.png");
+
+    await page.goto(resolveUrl("/overview"), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(300);
+    await screenshot(page, "02-overview.png");
 
     await page.locator('input[placeholder="OPENCLAW_GATEWAY_TOKEN"]').fill(GATEWAY_TOKEN);
     await page.getByRole("button", { name: /connect/i }).click();
@@ -61,7 +65,7 @@ async function main() {
     ]).catch(() => "timeout");
 
     await page.waitForTimeout(300);
-    await screenshot(page, "02-after-connect.png");
+    await screenshot(page, "03-overview-after-connect.png");
 
     if (outcome !== "connected") {
       const errText = await danger.innerText().catch(() => "");
@@ -78,16 +82,16 @@ async function main() {
 
     await page.goto(resolveUrl("/chat"), { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(300);
-    await screenshot(page, "03-chat.png");
+    await screenshot(page, "04-chat.png");
 
     await page.locator('input[type="file"][accept="image/*"]').setInputFiles(IMAGE_PATH);
     await page.waitForSelector(".chat-attachments img.chat-attachment__img", { timeout: 5000 });
-    await screenshot(page, "04-chat-attachment.png");
+    await screenshot(page, "05-chat-attachment.png");
 
     await page.locator(".chat-compose textarea").fill(CHAT_MESSAGE);
     await page.locator(".chat-compose__actions .btn.primary").click();
     await page.waitForTimeout(600);
-    await screenshot(page, "05-chat-sent.png");
+    await screenshot(page, "06-chat-sent.png");
   } finally {
     await context.close();
   }
