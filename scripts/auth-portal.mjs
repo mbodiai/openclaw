@@ -295,7 +295,11 @@ function buildLoginHtml({ returnTo }) {
 
 async function getSupabaseUser(accessToken) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured.");
+    return {
+      ok: false,
+      status: 500,
+      error: "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured.",
+    };
   }
   const base = SUPABASE_URL.replace(/\/+$/, "");
   const res = await fetch(`${base}/auth/v1/user`, {
@@ -306,11 +310,14 @@ async function getSupabaseUser(accessToken) {
     },
   });
   if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    const hint = msg && msg.length < 400 ? ` (${msg})` : "";
-    throw new Error(`Supabase auth failed (${res.status})${hint}`);
+    return {
+      ok: false,
+      status: res.status,
+      error: "Supabase auth failed.",
+    };
   }
-  return await res.json();
+  const user = await res.json();
+  return { ok: true, user };
 }
 
 function extractEmail(user) {
@@ -366,8 +373,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const accessToken = match[1].trim();
-      const user = await getSupabaseUser(accessToken);
-      const emailRaw = extractEmail(user);
+      const userRes = await getSupabaseUser(accessToken);
+      if (!userRes.ok) {
+        const status = userRes.status === 401 || userRes.status === 403 ? 401 : 502;
+        writeJson(res, status, { error: status === 401 ? "Unauthorized" : userRes.error });
+        return;
+      }
+      const emailRaw = extractEmail(userRes.user);
       const email = emailRaw?.trim().toLowerCase() ?? null;
       if (!email) {
         writeJson(res, 401, { error: "Could not resolve user email from Supabase token." });
