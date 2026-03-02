@@ -222,6 +222,13 @@ export function setSessionRuntimeModel(
   if (!provider || !model) {
     return false;
   }
+  // Don't stomp runtime fields when the user has a pending modelOverride
+  // pointing to a different model — otherwise run finalization silently
+  // reverts the user's /model selection (race condition).
+  const overrideModel = typeof entry.modelOverride === "string" ? entry.modelOverride.trim() : "";
+  if (overrideModel && overrideModel !== model) {
+    return false;
+  }
   entry.modelProvider = provider;
   entry.model = model;
   return true;

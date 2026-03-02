@@ -702,6 +702,24 @@ export function resolveSessionModelIdentityRef(
     | Pick<SessionEntry, "model" | "modelProvider" | "modelOverride" | "providerOverride">,
   agentId?: string,
 ): { provider?: string; model: string } {
+  // Check user-set overrides FIRST — these represent the user's explicit
+  // /model selection and must take precedence over stale runtime fields
+  // left behind by a previous run's finalization.
+  const overrideModel = entry?.modelOverride?.trim();
+  if (overrideModel) {
+    const overrideProvider = entry?.providerOverride?.trim();
+    if (overrideProvider) {
+      return { provider: overrideProvider, model: overrideModel };
+    }
+    const inferredProvider = inferUniqueProviderFromConfiguredModels({
+      cfg,
+      model: overrideModel,
+    });
+    if (inferredProvider) {
+      return { provider: inferredProvider, model: overrideModel };
+    }
+    return { model: overrideModel };
+  }
   const runtimeModel = entry?.model?.trim();
   const runtimeProvider = entry?.modelProvider?.trim();
   if (runtimeModel) {
