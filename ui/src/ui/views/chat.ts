@@ -286,6 +286,7 @@ export function renderChat(props: ChatProps) {
   const canCompose = props.connected;
   const isBusy = props.sending || props.stream !== null;
   const canAbort = Boolean(props.canAbort && props.onAbort);
+  const queueCount = props.queue.length;
   const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
   const reasoningLevel = activeSession?.reasoningLevel ?? "off";
   const showReasoning = props.showThinking && reasoningLevel !== "off";
@@ -505,6 +506,13 @@ export function renderChat(props: ChatProps) {
             ></textarea>
           </label>
           <div class="chat-compose__actions">
+            <span
+              class="chat-compose__queue-indicator ${queueCount ? "chat-compose__queue-indicator--active" : ""}"
+              title=${queueCount ? `${queueCount} queued message${queueCount === 1 ? "" : "s"}` : "No queued messages"}
+              aria-label=${`Queued messages: ${queueCount}`}
+            >
+              Queued (${queueCount})
+            </span>
             ${
               props.onAttachmentsChange
                 ? html`

@@ -311,6 +311,27 @@
   gap: 8px;
 }
 
+.chat-compose__queue-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+}
+
+.chat-compose__queue-indicator--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .chat-compose .chat-compose__actions .btn {
   padding: 0 16px;
   font-size: 13px;
