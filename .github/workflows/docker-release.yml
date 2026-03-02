@@ -12,6 +12,7 @@ on:
       - "**/*.mdx"
       - ".agents/**"
       - "skills/**"
+  workflow_dispatch:
 
 concurrency:
   group: docker-release-${{ github.workflow }}-${{ github.ref }}
