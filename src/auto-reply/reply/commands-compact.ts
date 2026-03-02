@@ -109,6 +109,10 @@ export const handleCompactCommand: CommandHandler = async (params) => {
     ownerNumbers: params.command.ownerList.length > 0 ? params.command.ownerList : undefined,
   });
 
+  const rawReason = result.reason?.trim();
+  const isCancelled =
+    !result.ok && typeof rawReason === "string" && rawReason.toLowerCase().includes("cancel");
+
   const compactLabel = result.ok
     ? result.compacted
       ? result.result?.tokensBefore != null && result.result?.tokensAfter != null
@@ -117,7 +121,9 @@ export const handleCompactCommand: CommandHandler = async (params) => {
           ? `Compacted (${formatTokenCount(result.result.tokensBefore)} before)`
           : "Compacted"
       : "Compaction skipped"
-    : "Compaction failed";
+    : isCancelled
+      ? "Compaction cancelled"
+      : "Compaction failed";
   if (result.ok && result.compacted) {
     await incrementCompactionCount({
       sessionEntry: params.sessionEntry,
@@ -135,7 +141,21 @@ export const handleCompactCommand: CommandHandler = async (params) => {
     typeof totalTokens === "number" && totalTokens > 0 ? totalTokens : null,
     params.contextTokens ?? params.sessionEntry.contextTokens ?? null,
   );
-  const reason = result.reason?.trim();
+  let reason = rawReason;
+  if (compactLabel === "Compaction cancelled" && typeof reason === "string") {
+    const lowered = reason.toLowerCase();
+    const prefix = "compaction cancelled";
+    if (lowered.startsWith(prefix)) {
+      reason = reason.slice(prefix.length).trimStart();
+      if (reason.startsWith(":")) {
+        reason = reason.slice(1).trimStart();
+      }
+      if (!reason.length) {
+        reason = undefined;
+      }
+    }
+  }
+
   const line = reason
     ? `${compactLabel}: ${reason} • ${contextSummary}`
     : `${compactLabel} • ${contextSummary}`;

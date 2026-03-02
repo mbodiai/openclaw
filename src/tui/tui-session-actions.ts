@@ -245,6 +245,30 @@ export function createSessionActions(context: SessionActionContext) {
         state.currentSessionKey = entry.key;
         updateHeader();
       }
+
+      const entrySessionId = typeof entry?.sessionId === "string" ? entry.sessionId : null;
+      const currentSessionId = state.currentSessionId;
+      const needsHistoryReload =
+        state.historyLoaded &&
+        currentSessionId &&
+        entrySessionId &&
+        entrySessionId !== currentSessionId;
+
+      if (needsHistoryReload) {
+        // Clear token counts immediately to avoid stale display while we reload
+        // a newly reset/rolled-over session transcript.
+        state.sessionInfo.inputTokens = null;
+        state.sessionInfo.outputTokens = null;
+        state.sessionInfo.totalTokens = null;
+        updateFooter();
+        tui.requestRender();
+
+        // IMPORTANT: do not await loadHistory from within refreshSessionInfo;
+        // loadHistory calls refreshSessionInfo at the end.
+        void loadHistory();
+        return;
+      }
+
       applySessionInfo({
         entry,
         defaults: result.defaults,

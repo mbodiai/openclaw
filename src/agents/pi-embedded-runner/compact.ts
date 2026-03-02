@@ -39,6 +39,7 @@ import {
   validateAnthropicTurns,
   validateGeminiTurns,
 } from "../pi-embedded-helpers.js";
+import { consumeCompactionCancelReason } from "../pi-extensions/compaction-cancel-reason-runtime.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import { resolveSandboxContext } from "../sandbox.js";
@@ -660,10 +661,24 @@ export async function compactEmbeddedPiSessionDirect(
           );
         }
 
+        // Clear any stale cancellation reason from prior compaction attempts.
+        consumeCompactionCancelReason(sessionManager);
+
         const compactStartedAt = Date.now();
-        const result = await compactWithSafetyTimeout(() =>
-          session.compact(params.customInstructions),
-        );
+        let result: Awaited<ReturnType<(typeof session)["compact"]>>;
+        try {
+          result = await compactWithSafetyTimeout(() => session.compact(params.customInstructions));
+        } catch (err) {
+          const baseReason = describeUnknownError(err);
+          const cancelReason = consumeCompactionCancelReason(sessionManager);
+          const reason =
+            cancelReason && baseReason.toLowerCase().includes("cancel")
+              ? `Compaction cancelled: ${cancelReason}`
+              : cancelReason
+                ? `${baseReason}: ${cancelReason}`
+                : baseReason;
+          return fail(reason);
+        }
         // Estimate tokens after compaction by summing token estimates for remaining messages
         let tokensAfter: number | undefined;
         try {

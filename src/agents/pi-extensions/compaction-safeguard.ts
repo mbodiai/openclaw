@@ -17,6 +17,7 @@ import {
   summarizeInStages,
 } from "../compaction.js";
 import { collectTextContentBlocks } from "../content-blocks.js";
+import { setCompactionCancelReason } from "./compaction-cancel-reason-runtime.js";
 import { getCompactionSafeguardRuntime } from "./compaction-safeguard-runtime.js";
 
 const log = createSubsystemLogger("compaction-safeguard");
@@ -199,6 +200,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       log.warn(
         "Compaction safeguard: cancelling compaction with no real conversation messages to summarize.",
       );
+      setCompactionCancelReason(ctx.sessionManager, "no conversation messages to summarize");
       return { cancel: true };
     }
     const { readFiles, modifiedFiles } = computeFileLists(preparation.fileOps);
@@ -228,6 +230,10 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
             "was not called and model was not passed through runtime registry.",
         );
       }
+      setCompactionCancelReason(
+        ctx.sessionManager,
+        "no model available for compaction summarization",
+      );
       return { cancel: true };
     }
 
@@ -235,6 +241,10 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
     if (!apiKey) {
       console.warn(
         "Compaction safeguard: no API key available; cancelling compaction to preserve history.",
+      );
+      setCompactionCancelReason(
+        ctx.sessionManager,
+        "no API key available for compaction summarization (cancelled to preserve history)",
       );
       return { cancel: true };
     }
@@ -377,11 +387,11 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
         },
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       log.warn(
-        `Compaction summarization failed; cancelling compaction to preserve history: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Compaction summarization failed; cancelling compaction to preserve history: ${message}`,
       );
+      setCompactionCancelReason(ctx.sessionManager, `compaction summarization failed: ${message}`);
       return { cancel: true };
     }
   });

@@ -111,4 +111,120 @@ describe("tui session actions", () => {
     expect(updateFooter).toHaveBeenCalledTimes(2);
     expect(requestRender).toHaveBeenCalledTimes(2);
   });
+
+  it("reloads history when sessionId changes (avoids stale token display)", async () => {
+    let resolveHistory: ((value: unknown) => void) | undefined;
+
+    const listSessions = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ts: Date.now(),
+        path: "/tmp/sessions.json",
+        count: 1,
+        defaults: {},
+        sessions: [
+          {
+            key: "agent:main:main",
+            sessionId: "session-new",
+            model: "gpt-5.2",
+            modelProvider: "openai",
+            totalTokens: 123,
+            contextTokens: 272000,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ts: Date.now(),
+        path: "/tmp/sessions.json",
+        count: 1,
+        defaults: {},
+        sessions: [
+          {
+            key: "agent:main:main",
+            sessionId: "session-new",
+            model: "gpt-5.2",
+            modelProvider: "openai",
+            totalTokens: 42,
+            contextTokens: 272000,
+          },
+        ],
+      });
+
+    const loadHistory = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveHistory = resolve;
+        }),
+    );
+
+    const state: TuiStateAccess = {
+      agentDefaultId: "main",
+      sessionMainKey: "agent:main:main",
+      sessionScope: "global",
+      agents: [],
+      currentAgentId: "main",
+      currentSessionKey: "agent:main:main",
+      currentSessionId: "session-old",
+      activeChatRunId: null,
+      historyLoaded: true,
+      sessionInfo: {
+        totalTokens: 229_000,
+        contextTokens: 272_000,
+      },
+      initialSessionApplied: true,
+      isConnected: true,
+      autoMessageSent: false,
+      toolsExpanded: false,
+      showThinking: false,
+      connectionStatus: "connected",
+      activityStatus: "idle",
+      statusTimeout: null,
+      lastCtrlCAt: 0,
+    };
+
+    const updateFooter = vi.fn();
+    const updateAutocompleteProvider = vi.fn();
+    const requestRender = vi.fn();
+
+    const chatLog = {
+      addSystem: vi.fn(),
+      clearAll: vi.fn(),
+      addUser: vi.fn(),
+      finalizeAssistant: vi.fn(),
+      startTool: vi.fn().mockReturnValue({ setResult: vi.fn() }),
+      dropAssistant: vi.fn(),
+    } as unknown as import("./components/chat-log.js").ChatLog;
+
+    const { refreshSessionInfo } = createSessionActions({
+      client: { listSessions, loadHistory } as unknown as GatewayChatClient,
+      chatLog,
+      tui: { requestRender } as unknown as import("@mariozechner/pi-tui").TUI,
+      opts: {},
+      state,
+      agentNames: new Map(),
+      initialSessionInput: "",
+      initialSessionAgentId: null,
+      resolveSessionKey: vi.fn(),
+      updateHeader: vi.fn(),
+      updateFooter,
+      updateAutocompleteProvider,
+      setActivityStatus: vi.fn(),
+    });
+
+    await refreshSessionInfo();
+
+    expect(loadHistory).toHaveBeenCalledTimes(1);
+    expect(state.sessionInfo.totalTokens).toBeNull();
+    expect(updateFooter).toHaveBeenCalled();
+
+    resolveHistory?.({ messages: [], sessionId: "session-new" });
+
+    // Flush the loadHistory → refreshSessionInfo chain.
+    for (let i = 0; i < 5; i++) {
+      await Promise.resolve();
+    }
+
+    expect(state.currentSessionId).toBe("session-new");
+    expect(state.sessionInfo.totalTokens).toBe(42);
+  });
 });
