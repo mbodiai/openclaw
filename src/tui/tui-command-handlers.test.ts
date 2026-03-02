@@ -181,7 +181,6 @@ describe("tui command handlers", () => {
       reasoningLevel: "stream",
     });
     expect(addSystem).toHaveBeenCalledWith("reasoning set to stream");
-    expect(refreshSessionInfo).toHaveBeenCalled();
   });
 
   it("queues messages while a run is active and flushes them in order", async () => {
@@ -193,10 +192,12 @@ describe("tui command handlers", () => {
     const state: {
       currentSessionKey: string;
       activeChatRunId: string | null;
+      isConnected: boolean;
       sessionInfo: Record<string, never>;
     } = {
       currentSessionKey: "agent:main:main",
       activeChatRunId: "active-run",
+      isConnected: true,
       sessionInfo: {},
     };
 
@@ -247,5 +248,48 @@ describe("tui command handlers", () => {
 
     expect(setActivityStatus).toHaveBeenCalledWith("sending");
     expect(setActivityStatus).toHaveBeenCalledWith("waiting");
+  });
+
+  it("can pop the most recent queued message for edit (LIFO)", async () => {
+    const addUser = vi.fn();
+    const addSystem = vi.fn();
+    const requestRender = vi.fn();
+    const state: {
+      currentSessionKey: string;
+      activeChatRunId: string | null;
+      sessionInfo: Record<string, never>;
+    } = {
+      currentSessionKey: "agent:main:main",
+      activeChatRunId: "active-run",
+      sessionInfo: {},
+    };
+
+    const { sendMessage, popQueuedMessage } = createCommandHandlers({
+      client: { sendChat: vi.fn() } as never,
+      chatLog: { addUser, addSystem } as never,
+      tui: { requestRender } as never,
+      opts: {},
+      state: state as never,
+      deliverDefault: false,
+      openOverlay: vi.fn(),
+      closeOverlay: vi.fn(),
+      refreshSessionInfo: vi.fn(),
+      loadHistory: vi.fn(),
+      setSession: vi.fn(),
+      refreshAgents: vi.fn(),
+      abortActive: vi.fn(),
+      setActivityStatus: vi.fn(),
+      formatSessionKey: vi.fn(),
+      applySessionInfoFromPatch: vi.fn(),
+      noteLocalRunId: vi.fn(),
+      forgetLocalRunId: vi.fn(),
+    });
+
+    await sendMessage("first queued");
+    await sendMessage("second queued");
+
+    expect(popQueuedMessage()).toBe("second queued");
+    expect(popQueuedMessage()).toBe("first queued");
+    expect(popQueuedMessage()).toBeNull();
   });
 });

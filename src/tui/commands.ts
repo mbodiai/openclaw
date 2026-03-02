@@ -108,6 +108,14 @@ export function getSlashCommands(options: SlashCommandOptions = {}): SlashComman
       getArgumentCompletions: activationCompletions,
     },
     { name: "abort", description: "Abort active run (or /stop)" },
+    {
+      name: "queue",
+      description: "View/manage queued messages",
+      getArgumentCompletions: (prefix) =>
+        ["clear", "drop"]
+          .filter((v) => v.startsWith(prefix.toLowerCase()))
+          .map((v) => ({ value: v, label: v })),
+    },
     { name: "new", description: "Reset the session" },
     { name: "reset", description: "Reset the session" },
     { name: "settings", description: "Open settings" },
@@ -151,6 +159,7 @@ export function helpText(options: SlashCommandOptions = {}): string {
     "/activation <mention|always>",
     "/new or /reset",
     "/abort",
+    "/queue [clear | drop <#>]",
     "/settings",
     "/exit",
   ].join("\n");

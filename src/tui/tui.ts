@@ -320,6 +320,7 @@ export async function runTui(opts: TuiOptions) {
   let wasDisconnected = false;
   let toolsExpanded = false;
   let showThinking = true;
+  let queuedCount = 0;
   let pairingHintShown = false;
   const localRunIds = new Set<string>();
 
@@ -431,6 +432,12 @@ export async function runTui(opts: TuiOptions) {
     },
     set showThinking(value) {
       showThinking = value;
+    },
+    get queuedCount() {
+      return queuedCount;
+    },
+    set queuedCount(value) {
+      queuedCount = value;
     },
     get connectionStatus() {
       return connectionStatus;
@@ -786,16 +793,21 @@ export async function runTui(opts: TuiOptions) {
     const reasoning = sessionInfo.reasoningLevel ?? "off";
     const reasoningLabel =
       reasoning === "on" ? "reasoning" : reasoning === "stream" ? "reasoning:stream" : null;
+    const queueLabel =
+      queuedCount > 0
+        ? theme.bold(theme.accent(`[⌛ ${queuedCount} queued]`))
+        : theme.dim(`[⌛ ${queuedCount} queued]`);
     const footerParts = [
-      `agent ${agentLabel}`,
-      `session ${sessionLabel}`,
-      modelLabel,
-      think !== "off" ? `think ${think}` : null,
-      verbose !== "off" ? `verbose ${verbose}` : null,
-      reasoningLabel,
-      tokens,
+      theme.dim(`agent ${agentLabel}`),
+      theme.dim(`session ${sessionLabel}`),
+      theme.dim(modelLabel),
+      think !== "off" ? theme.dim(`think ${think}`) : null,
+      verbose !== "off" ? theme.dim(`verbose ${verbose}`) : null,
+      reasoningLabel ? theme.dim(reasoningLabel) : null,
+      theme.dim(tokens),
+      queueLabel,
     ].filter(Boolean);
-    footer.setText(theme.dim(footerParts.join(" | ")));
+    footer.setText(footerParts.join(theme.dim(" | ")));
   };
 
   const { openOverlay, closeOverlay } = createOverlayHandlers(tui, editor);
@@ -854,6 +866,7 @@ export async function runTui(opts: TuiOptions) {
     handleCommand,
     sendMessage,
     flushQueuedMessage,
+    popQueuedMessage,
     clearQueue,
     openModelSelector,
     openAgentSelector,
@@ -878,6 +891,7 @@ export async function runTui(opts: TuiOptions) {
     noteLocalRunId,
     forgetLocalRunId,
     requestExit,
+    updateFooter,
   });
 
   const { handleChatEvent, handleAgentEvent, drainPendingAgentEvents, resetAgentEventBuffer } =
@@ -922,6 +936,19 @@ export async function runTui(opts: TuiOptions) {
   editor.onEscape = () => {
     void abortActive();
     clearQueue();
+  };
+
+  editor.onAltUp = () => {
+    if (state.queuedCount <= 0) {
+      return false;
+    }
+    const next = popQueuedMessage();
+    if (!next) {
+      return false;
+    }
+    editor.setText(next);
+    tui.requestRender();
+    return true;
   };
   const handleCtrlC = () => {
     // If a run is active, abort it first (and clear queue).

@@ -45,6 +45,7 @@ type CommandHandlerContext = {
   noteLocalRunId: (runId: string) => void;
   forgetLocalRunId?: (runId: string) => void;
   requestExit: () => void;
+  updateFooter?: () => void;
 };
 
 export function createCommandHandlers(context: CommandHandlerContext) {
@@ -57,7 +58,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     deliverDefault,
     openOverlay,
     closeOverlay,
-    refreshSessionInfo,
+    refreshSessionInfo: _refreshSessionInfo,
     loadHistory,
     setSession,
     refreshAgents,
@@ -68,6 +69,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     noteLocalRunId,
     forgetLocalRunId,
     requestExit,
+    updateFooter,
   } = context;
 
   const setAgent = async (id: string) => {
@@ -271,9 +273,15 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     tui.requestRender();
   };
 
+  const syncQueueCount = () => {
+    state.queuedCount = queuedMessages.length;
+    updateFooter?.();
+  };
+
   const sendMessage = async (text: string) => {
     if (state.activeChatRunId) {
       queuedMessages.push(text);
+      syncQueueCount();
       chatLog.addUser(text);
       chatLog.addSystem(`queued (${queuedMessages.length})`);
       tui.requestRender();
@@ -287,6 +295,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
       return false;
     }
     const next = queuedMessages.shift();
+    syncQueueCount();
     if (!next) {
       return false;
     }
@@ -296,6 +305,17 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     }
     await sendMessageNow(next, { addToChatLog: false });
     return true;
+  };
+
+  const popQueuedMessage = (): string | null => {
+    const next = queuedMessages.pop();
+    syncQueueCount();
+    if (!next) {
+      return null;
+    }
+    chatLog.addSystem(`pulled queued message for edit (${queuedMessages.length} left)`);
+    tui.requestRender();
+    return next;
   };
 
   const handleCommand = async (raw: string) => {
@@ -507,6 +527,35 @@ export function createCommandHandlers(context: CommandHandlerContext) {
         await abortActive();
         clearQueue();
         break;
+      case "queue":
+        if (queuedMessages.length === 0) {
+          chatLog.addSystem("queue is empty");
+        } else if (!args) {
+          // /queue — show all queued messages
+          for (let i = 0; i < queuedMessages.length; i++) {
+            const preview =
+              queuedMessages[i].length > 80
+                ? queuedMessages[i].slice(0, 80) + "…"
+                : queuedMessages[i];
+            chatLog.addSystem(`  [${i + 1}] ${preview}`);
+          }
+          chatLog.addSystem(`${queuedMessages.length} queued — /queue clear | /queue drop <#>`);
+        } else if (args === "clear") {
+          clearQueue();
+        } else if (args.startsWith("drop ")) {
+          const idx = parseInt(args.slice(5).trim(), 10) - 1;
+          if (Number.isNaN(idx) || idx < 0 || idx >= queuedMessages.length) {
+            chatLog.addSystem(`invalid index (1-${queuedMessages.length})`);
+          } else {
+            const removed = queuedMessages.splice(idx, 1)[0];
+            syncQueueCount();
+            const preview = removed.length > 60 ? removed.slice(0, 60) + "…" : removed;
+            chatLog.addSystem(`dropped [${idx + 1}]: ${preview}`);
+          }
+        } else {
+          chatLog.addSystem("usage: /queue [clear | drop <#>]");
+        }
+        break;
       case "settings":
         openSettings();
         break;
@@ -524,6 +573,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
   const clearQueue = () => {
     const dropped = queuedMessages.length;
     queuedMessages.length = 0;
+    syncQueueCount();
     if (dropped > 0) {
       chatLog.addSystem(`dropped ${dropped} queued message${dropped > 1 ? "s" : ""}`);
     }
@@ -533,6 +583,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     handleCommand,
     sendMessage,
     flushQueuedMessage,
+    popQueuedMessage,
     clearQueue,
     openModelSelector,
     openAgentSelector,
