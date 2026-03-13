@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { Text, type Component, type SelectItem, type TUI } from "@mariozechner/pi-tui";
-import chalk from "chalk";
 import {
   formatThinkingLevels,
   normalizeReasoningLevel,
@@ -18,7 +17,7 @@ import {
   createSettingsList,
 } from "./components/selectors.js";
 import type { GatewayChatClient } from "./gateway-chat.js";
-import { palette, theme } from "./theme/theme.js";
+import { theme } from "./theme/theme.js";
 import { sanitizeRenderableText } from "./tui-formatters.js";
 import { formatStatusSummary } from "./tui-status-summary.js";
 import type {
@@ -244,17 +243,16 @@ export function createCommandHandlers(context: CommandHandlerContext) {
 
   const queuedMessages: string[] = [];
 
-  const pillText = (msg: string, maxLen = 30) => {
-    const trimmed = msg.length > maxLen ? `${msg.slice(0, maxLen - 1)}…` : msg;
-    return chalk.bgHex(palette.border).hex(palette.text)(` ${trimmed} `);
-  };
-
   const updateQueueDisplay = () => {
     queueContainer.clear();
     if (queuedMessages.length > 0) {
-      const pills = queuedMessages.map((m) => pillText(m));
-      const label = theme.dim(`queued ${queuedMessages.length}`);
-      queueContainer.addChild(new Text(`${label}  ${pills.join(" ")}`, 1, 0));
+      queueContainer.addChild(new Text(theme.dim(`── queued (${queuedMessages.length}) ──`), 1, 0));
+      for (let i = 0; i < queuedMessages.length; i++) {
+        const msg = queuedMessages[i];
+        const maxLen = Math.max(40, (process.stdout.columns || 80) - 8);
+        const display = msg.length > maxLen ? `${msg.slice(0, maxLen - 1)}…` : msg;
+        queueContainer.addChild(new Text(theme.dim(`  ${i + 1}. `) + theme.fg(display), 1, 0));
+      }
     }
     tui.requestRender();
   };
