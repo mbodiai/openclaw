@@ -1,5 +1,8 @@
 import { formatRawAssistantErrorForUi } from "../agents/pi-embedded-helpers.js";
+import { stripModelSpecialTokens } from "../agents/pi-embedded-utils.js";
 import { stripLeadingInboundMetadata } from "../auto-reply/reply/strip-inbound-meta.js";
+import { findCodeRegions, isInsideCode } from "../shared/text/code-regions.js";
+import { stripReasoningTagsFromText } from "../shared/text/reasoning-tags.js";
 import { stripAnsi } from "../terminal/ansi.js";
 import { formatTokenCount } from "../utils/usage-format.js";
 
@@ -19,6 +22,8 @@ const RTL_SCRIPT_RE = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/;
 const BIDI_CONTROL_RE = /[\u202a-\u202e\u2066-\u2069]/;
 const RTL_ISOLATE_START = "\u2067";
 const RTL_ISOLATE_END = "\u2069";
+const REASONING_QUICK_TAG_RE = /<\s*\/?\s*(?:think(?:ing)?|thought|antthinking|final)\b/i;
+const REASONING_TAG_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\b[^<>]*>/gi;
 
 function hasControlChars(text: string): boolean {
   for (const char of text) {
@@ -126,6 +131,71 @@ function applyRtlIsolation(text: string): string {
     .split("\n")
     .map((line) => isolateRtlLine(line))
     .join("\n");
+}
+
+function normalizeStringMessageContent(text: string): string {
+  return sanitizeRenderableText(
+    stripReasoningTagsFromText(stripModelSpecialTokens(text), {
+      mode: "strict",
+      trim: "both",
+    }),
+  ).trim();
+}
+
+function splitTaggedReasoningString(
+  text: string,
+): { thinkingText: string; contentText: string } | null {
+  const cleanedInput = stripModelSpecialTokens(text);
+  if (!cleanedInput || !REASONING_QUICK_TAG_RE.test(cleanedInput)) {
+    return null;
+  }
+
+  const codeRegions = findCodeRegions(cleanedInput);
+  REASONING_TAG_RE.lastIndex = 0;
+
+  const thinkingParts: string[] = [];
+  let inThinking = false;
+  let thinkingStart = 0;
+
+  for (const match of cleanedInput.matchAll(REASONING_TAG_RE)) {
+    const index = match.index ?? 0;
+    if (isInsideCode(index, codeRegions)) {
+      continue;
+    }
+
+    const isClose = match[1] === "/";
+    if (!inThinking && !isClose) {
+      inThinking = true;
+      thinkingStart = index + match[0].length;
+      continue;
+    }
+
+    if (inThinking && isClose) {
+      const chunk = cleanedInput.slice(thinkingStart, index).trim();
+      if (chunk) {
+        thinkingParts.push(chunk);
+      }
+      inThinking = false;
+    }
+  }
+
+  if (inThinking) {
+    const trailingChunk = cleanedInput.slice(thinkingStart).trim();
+    if (trailingChunk) {
+      thinkingParts.push(trailingChunk);
+    }
+  }
+
+  const thinkingText = sanitizeRenderableText(thinkingParts.join("\n").trim());
+  if (!thinkingText) {
+    return null;
+  }
+
+  const contentText = sanitizeRenderableText(
+    stripReasoningTagsFromText(cleanedInput, { mode: "strict", trim: "both" }),
+  ).trim();
+
+  return { thinkingText, contentText };
 }
 
 export function sanitizeRenderableText(text: string): string {
@@ -256,7 +326,7 @@ export function extractThinkingFromMessage(message: unknown): string {
   }
   const { content } = resolved;
   if (typeof content === "string") {
-    return "";
+    return splitTaggedReasoningString(content)?.thinkingText ?? "";
   }
   const parts = collectSanitizedBlockStrings({
     content,
@@ -278,7 +348,11 @@ export function extractContentFromMessage(message: unknown): string {
   const { record, content } = resolved;
 
   if (typeof content === "string") {
-    return sanitizeRenderableText(content).trim();
+    const split = splitTaggedReasoningString(content);
+    if (split) {
+      return split.contentText;
+    }
+    return normalizeStringMessageContent(content);
   }
 
   const parts = collectSanitizedBlockStrings({
@@ -294,7 +368,15 @@ export function extractContentFromMessage(message: unknown): string {
 
 function extractTextBlocks(content: unknown, opts?: { includeThinking?: boolean }): string {
   if (typeof content === "string") {
-    return sanitizeRenderableText(content).trim();
+    const split = splitTaggedReasoningString(content);
+    if (split) {
+      return composeThinkingAndContent({
+        thinkingText: split.thinkingText,
+        contentText: split.contentText,
+        showThinking: opts?.includeThinking ?? false,
+      });
+    }
+    return normalizeStringMessageContent(content);
   }
   if (!Array.isArray(content)) {
     return "";
