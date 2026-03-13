@@ -13,7 +13,7 @@ export class ChatLog extends Container {
   private btwMessage: BtwInlineMessage | null = null;
   private toolsExpanded = false;
 
-  constructor(maxComponents = 180) {
+  constructor(maxComponents = 80) {
     super();
     this.maxComponents = Math.max(20, Math.floor(maxComponents));
   }
