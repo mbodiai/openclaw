@@ -261,9 +261,6 @@ describe("gateway server sessions", () => {
           model: "claude-sonnet-4-6",
           inputTokens: 10,
           outputTokens: 20,
-          totalTokens: 900_000,
-          totalTokensFresh: true,
-          contextTokens: 1_048_576,
           thinkingLevel: "low",
           verboseLevel: "on",
           lastChannel: "whatsapp",
@@ -331,8 +328,8 @@ describe("gateway server sessions", () => {
     expect(list1.payload?.sessions.some((s) => s.key === "global")).toBe(false);
     expect(list1.payload?.defaults?.modelProvider).toBe(DEFAULT_PROVIDER);
     const main = list1.payload?.sessions.find((s) => s.key === "agent:main:main");
-    expect(main?.totalTokens).toBe(900_000);
-    expect(main?.totalTokensFresh).toBe(true);
+    expect(main?.totalTokens).toBeUndefined();
+    expect(main?.totalTokensFresh).toBe(false);
     expect(main?.thinkingLevel).toBe("low");
     expect(main?.verboseLevel).toBe("on");
     expect(main?.lastAccountId).toBe("work");
@@ -487,9 +484,7 @@ describe("gateway server sessions", () => {
     expect(spawnedPatchedInvalidKey.ok).toBe(false);
 
     piSdkMock.enabled = true;
-    piSdkMock.models = [
-      { id: "gpt-test-a", name: "A", provider: "openai", contextWindow: 262_144 },
-    ];
+    piSdkMock.models = [{ id: "gpt-test-a", name: "A", provider: "openai" }];
     const modelPatched = await rpcReq<{
       ok: true;
       entry: {
@@ -497,9 +492,6 @@ describe("gateway server sessions", () => {
         providerOverride?: string;
         model?: string;
         modelProvider?: string;
-        contextTokens?: number;
-        totalTokens?: number;
-        totalTokensFresh?: boolean;
       };
       resolved?: { model?: string; modelProvider?: string };
     }>(ws, "sessions.patch", {
@@ -511,21 +503,11 @@ describe("gateway server sessions", () => {
     expect(modelPatched.payload?.entry.providerOverride).toBe("openai");
     expect(modelPatched.payload?.entry.model).toBeUndefined();
     expect(modelPatched.payload?.entry.modelProvider).toBeUndefined();
-    expect(modelPatched.payload?.entry.contextTokens).toBe(262_144);
-    expect(modelPatched.payload?.entry.totalTokens).toBeUndefined();
-    expect(modelPatched.payload?.entry.totalTokensFresh).toBeUndefined();
     expect(modelPatched.payload?.resolved?.modelProvider).toBe("openai");
     expect(modelPatched.payload?.resolved?.model).toBe("gpt-test-a");
 
     const listAfterModelPatch = await rpcReq<{
-      sessions: Array<{
-        key: string;
-        modelProvider?: string;
-        model?: string;
-        contextTokens?: number;
-        totalTokens?: number;
-        totalTokensFresh?: boolean;
-      }>;
+      sessions: Array<{ key: string; modelProvider?: string; model?: string }>;
     }>(ws, "sessions.list", {});
     expect(listAfterModelPatch.ok).toBe(true);
     const mainAfterModelPatch = listAfterModelPatch.payload?.sessions.find(
@@ -533,9 +515,6 @@ describe("gateway server sessions", () => {
     );
     expect(mainAfterModelPatch?.modelProvider).toBe("openai");
     expect(mainAfterModelPatch?.model).toBe("gpt-test-a");
-    expect(mainAfterModelPatch?.contextTokens).toBe(262_144);
-    expect(mainAfterModelPatch?.totalTokens).toBeUndefined();
-    expect(mainAfterModelPatch?.totalTokensFresh).toBe(false);
 
     const compacted = await rpcReq<{ ok: true; compacted: boolean }>(ws, "sessions.compact", {
       key: "agent:main:main",
