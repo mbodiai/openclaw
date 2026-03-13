@@ -111,7 +111,7 @@ class ThinkingWrapper implements Component {
     const result: string[] = [];
 
     // Top border
-    result.push(theme.dim("╭─ ") + theme.bold(theme.dim("Thinking")));
+    result.push(theme.dim("╭─ ") + theme.italic(theme.bold(theme.dim("Thinking..."))));
 
     // Middle lines with left border
     for (const line of innerLines) {
