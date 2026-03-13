@@ -906,6 +906,8 @@ export async function runTui(opts: TuiOptions) {
 
   const {
     handleCommand,
+    popQueue,
+
     sendMessage,
     flushQueuedMessage,
     clearQueue,
@@ -967,6 +969,8 @@ export async function runTui(opts: TuiOptions) {
     promptHistory,
     getSessionKey: () => state.currentSessionKey,
     handleCommand,
+    popQueue,
+
     sendMessage,
     handleBangLine: runLocalShellLine,
   });
@@ -997,6 +1001,13 @@ export async function runTui(opts: TuiOptions) {
     }
     const shown = remainder.length > 80 ? `${remainder.slice(0, 79)}…` : remainder;
     setInputHint(`tab: ${shown}`);
+  };
+
+  editor.onAltUp = () => {
+    const popped = popQueue();
+    if (popped) {
+      editor.setText(popped);
+    }
   };
 
   editor.onEscape = () => {

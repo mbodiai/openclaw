@@ -38,6 +38,7 @@ export class CustomEditor extends Editor {
   onCtrlY?: () => void;
   onShiftTab?: () => void;
   onAltEnter?: () => void;
+  onAltUp?: () => void;
 
   private readonly promptHistory?: TuiPromptHistory;
   private readonly getSessionKey: () => string;
@@ -300,6 +301,11 @@ export class CustomEditor extends Editor {
 
   handleInput(data: string): void {
     const beforeText = this.getText();
+
+    if (matchesKey(data, Key.alt("up")) && this.onAltUp) {
+      this.onAltUp();
+      return;
+    }
 
     if (matchesKey(data, Key.alt("enter")) && this.onAltEnter) {
       this.onAltEnter();
