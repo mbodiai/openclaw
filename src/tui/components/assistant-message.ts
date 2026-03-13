@@ -1,4 +1,4 @@
-import { Container, Spacer, Text } from "@mariozechner/pi-tui";
+import { Container, Spacer, Text, Markdown } from "@mariozechner/pi-tui";
 import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
 import { markdownTheme, theme } from "../theme/theme.js";
 import { HyperlinkMarkdown } from "./hyperlink-markdown.js";
@@ -38,8 +38,7 @@ function compactThinkingForUi(text: string, maxLen = 300) {
   const parts = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
   let result = "";
   for (let i = parts.length - 1; i >= 0; i--) {
-    const candidate = parts.slice(i).join("
-");
+    const candidate = parts.slice(i).join(" ");
     if (candidate.length <= maxLen) {
       result = candidate;
     } else {
@@ -68,12 +67,14 @@ export function setVerboseFullMode(value: boolean) {
 }
 
 export class AssistantMessageComponent extends Container {
-  private thinking: Text;
+  private thinking: Markdown;
   private body: HyperlinkMarkdown;
 
   constructor(text: string) {
     super();
-    this.thinking = new Text("", 1, 0);
+    this.thinking = new Markdown("", 1, 0, markdownTheme, {
+      color: (line) => theme.dim(line)
+    });
     this.body = new HyperlinkMarkdown("", 1, 0, markdownTheme, {
       // Keep assistant body text in terminal default foreground so contrast
       // follows the user's terminal theme (dark or light).
@@ -99,15 +100,20 @@ export class AssistantMessageComponent extends Container {
       const expanded = thinkingExpandedView || verboseFullMode;
       const actualThinking = expanded ? thinking.trim() : compactThinkingForUi(thinking.replace(/\s+/g, " "));
       const lines = actualThinking.split("\n");
-      // Use a subtle dim gray vertical bar for the thinking block
-      // Use a thick subtle bar like Claude Code does for thinking
-      const borderChar = theme.dim("┃");
-      const formatted = lines.map(line => `${borderChar} ${theme.dim(line)}`).join("
-");
-      this.thinking.setText(`${theme.dim("💭 Thinking")}
-${formatted}
-
-`);
+      // If using Markdown component, just prepend the blockquote style or pass it directly.
+      // But we need the specific border style. The pi-tui Markdown component will just render the text. 
+      // Let's strip ANSI from the raw text first.
+      const cleanThinking = actualThinking.replace(/\x1B\[\d+;?\d*m/g, "");
+      
+      // Instead of manual lines, we can just use the Markdown component and give it standard markdown quotes or headers. 
+      // But to match the EXACT screenshot design, we'll manually apply chalk formatting to bold text since `pi-tui` Text component doesn't parse Markdown unless we use the Markdown component. 
+      // We changed `this.thinking` to `Markdown`. The `Markdown` component WILL parse `**bold**` natively!
+      // But we need to inject the borders on every line. 
+      // A hack is to format it first, but Markdown parsing might mess up the borders.
+      // The safest way to preserve Markdown parsing AND the borders is to use a Box or render Markdown and wrap it, but pi-tui Box doesn't have partial borders.
+      
+      const formatted = cleanThinking.split("\n").map((line: string) => `│  ${line}`).join("\n");
+      this.thinking.setText(`╭─ Thinking\n${formatted}\n╰─\n`);
     } else {
       this.thinking.setText("");
     }
@@ -116,6 +122,8 @@ ${formatted}
       mode: "preserve",
       trim: "both",
     }).replace(/<\/?final>/g, "");
-    this.body.setText(cleanedBodyText);
+    this.body.setText(`**Agent**
+
+` + cleanedBodyText);
   }
 }
