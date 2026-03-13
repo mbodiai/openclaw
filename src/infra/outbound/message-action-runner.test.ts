@@ -415,35 +415,28 @@ describe("runMessageAction context isolation", () => {
     expect(result.channel).toBe("slack");
   });
 
-  it("falls back to tool-context provider when channel param is an id", async () => {
-    const result = await runDrySend({
-      cfg: slackConfig,
-      actionParams: {
-        channel: "C12345678",
-        target: "#C12345678",
-        message: "hi",
+  it("fails closed for internal webchat contexts when channel is omitted", async () => {
+    const telegramOnlyConfig = {
+      channels: {
+        telegram: {
+          token: "tg-test",
+        },
       },
-      toolContext: { currentChannelId: "C12345678", currentChannelProvider: "slack" },
-    });
+    } as OpenClawConfig;
 
-    expect(result.kind).toBe("send");
-    expect(result.channel).toBe("slack");
-  });
-
-  it("falls back to tool-context provider for broadcast channel ids", async () => {
-    const result = await runDryAction({
-      cfg: slackConfig,
-      action: "broadcast",
-      actionParams: {
-        targets: ["channel:C12345678"],
-        channel: "C12345678",
-        message: "hi",
-      },
-      toolContext: { currentChannelProvider: "slack" },
-    });
-
-    expect(result.kind).toBe("broadcast");
-    expect(result.channel).toBe("slack");
+    await expect(
+      runDrySend({
+        cfg: telegramOnlyConfig,
+        actionParams: {
+          target: "webchat:user-123",
+          message: "hi",
+        },
+        toolContext: {
+          currentChannelId: "webchat:user-123",
+          currentChannelProvider: "webchat",
+        },
+      }),
+    ).rejects.toThrow(/cannot auto-route to internal webchat/i);
   });
 
   it("blocks cross-provider sends by default", async () => {
