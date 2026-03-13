@@ -273,53 +273,6 @@ describe("gateway sessions patch", () => {
     expect(entry.modelOverride).toBe("claude-sonnet-4-6");
   });
 
-  test("refreshes context tokens and clears stale usage when patching the model", async () => {
-    const store: Record<string, SessionEntry> = {
-      "agent:main:main": {
-        sessionId: "sess",
-        updatedAt: 1,
-        providerOverride: "anthropic",
-        modelOverride: "claude-opus-4-6",
-        totalTokens: 900_000,
-        totalTokensFresh: true,
-        inputTokens: 600_000,
-        outputTokens: 300_000,
-        cacheRead: 100,
-        cacheWrite: 20,
-        contextTokens: 1_048_576,
-      } as SessionEntry,
-    };
-
-    const res = await applySessionsPatchToStore({
-      cfg: {} as OpenClawConfig,
-      store,
-      storeKey: "agent:main:main",
-      patch: { key: "agent:main:main", model: "openai/gpt-test-window" },
-      loadGatewayModelCatalog: async () => [
-        {
-          provider: "openai",
-          id: "gpt-test-window",
-          name: "gpt-test-window",
-          contextWindow: 200_000,
-        },
-      ],
-    });
-
-    expect(res.ok).toBe(true);
-    if (!res.ok) {
-      return;
-    }
-    expect(res.entry.providerOverride).toBe("openai");
-    expect(res.entry.modelOverride).toBe("gpt-test-window");
-    expect(res.entry.contextTokens).toBe(200_000);
-    expect(res.entry.totalTokens).toBeUndefined();
-    expect(res.entry.totalTokensFresh).toBeUndefined();
-    expect(res.entry.inputTokens).toBeUndefined();
-    expect(res.entry.outputTokens).toBeUndefined();
-    expect(res.entry.cacheRead).toBeUndefined();
-    expect(res.entry.cacheWrite).toBeUndefined();
-  });
-
   test("sets spawnDepth for subagent sessions", async () => {
     const entry = expectPatchOk(
       await runPatch({

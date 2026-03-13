@@ -458,9 +458,6 @@ export async function runPreparedReply(
     resolvedQueue.mode === "followup" ||
     resolvedQueue.mode === "collect" ||
     resolvedQueue.mode === "steer-backlog";
-  const hasSessionModelOverride = Boolean(
-    sessionEntry?.modelOverride?.trim() || sessionEntry?.providerOverride?.trim(),
-  );
   const authProfileId = await resolveSessionAuthProfileOverride({
     cfg,
     provider,
@@ -510,7 +507,6 @@ export async function runPreparedReply(
       skillsSnapshot,
       provider,
       model,
-      hasSessionModelOverride,
       authProfileId,
       authProfileIdSource,
       thinkLevel: resolvedThinkLevel,

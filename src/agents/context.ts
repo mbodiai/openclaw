@@ -1,12 +1,11 @@
 // Lazy-load pi-coding-agent model metadata so we can infer context windows when
 // the agent reports a model id. This includes custom models.json entries.
 
-import type { OpenClawConfig } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { computeBackoff, type BackoffPolicy } from "../infra/backoff.js";
 import { consumeRootOptionToken, FLAG_TERMINATOR } from "../infra/cli-root-options.js";
 import { resolveOpenClawAgentDir } from "./agent-paths.js";
-import { DEFAULT_CONTEXT_TOKENS } from "./defaults.js";
 import { normalizeProviderId } from "./model-selection.js";
 import { ensureOpenClawModelsJson } from "./models-config.js";
 
@@ -388,23 +387,4 @@ export function resolveContextTokensForModel(params: {
   }
 
   return params.fallbackContextTokens;
-}
-
-export function resolveSessionContextTokensForModel(params: {
-  cfg?: OpenClawConfig;
-  provider?: string;
-  model?: string;
-  contextTokensOverride?: number;
-  fallbackContextTokens?: number;
-}): number {
-  return (
-    resolveContextTokensForModel({
-      cfg: params.cfg,
-      provider: params.provider,
-      model: params.model,
-      contextTokensOverride:
-        params.contextTokensOverride ?? params.cfg?.agents?.defaults?.contextTokens,
-      fallbackContextTokens: params.fallbackContextTokens ?? DEFAULT_CONTEXT_TOKENS,
-    }) ?? DEFAULT_CONTEXT_TOKENS
-  );
 }

@@ -11,7 +11,6 @@ export function applyModelOverrideToSessionEntry(params: {
   selection: ModelOverrideSelection;
   profileOverride?: string;
   profileOverrideSource?: "auto" | "user";
-  contextTokens?: number;
 }): { updated: boolean } {
   const { entry, selection, profileOverride } = params;
   const profileOverrideSource = params.profileOverrideSource ?? "user";
@@ -51,14 +50,6 @@ export function applyModelOverrideToSessionEntry(params: {
   const runtimeAligned =
     runtimeModel === selection.model &&
     (runtimeProvider.length === 0 || runtimeProvider === selection.provider);
-  const nextContextTokens =
-    typeof params.contextTokens === "number" && params.contextTokens > 0
-      ? params.contextTokens
-      : undefined;
-  const contextTokensChanged =
-    nextContextTokens !== undefined && entry.contextTokens !== nextContextTokens;
-  const shouldInvalidateUsage =
-    selectionUpdated || (runtimePresent && !runtimeAligned) || contextTokensChanged;
   if (runtimePresent && (selectionUpdated || !runtimeAligned)) {
     if (entry.model !== undefined) {
       delete entry.model;
@@ -73,47 +64,12 @@ export function applyModelOverrideToSessionEntry(params: {
   // contextTokens are derived from the active session model. When the selected
   // model changes (or runtime model is already stale), the cached window can
   // pin the session to an older/smaller limit until another run refreshes it.
-  if (shouldInvalidateUsage) {
-    if (entry.inputTokens !== undefined) {
-      delete entry.inputTokens;
-      updated = true;
-    }
-    if (entry.outputTokens !== undefined) {
-      delete entry.outputTokens;
-      updated = true;
-    }
-    if (entry.totalTokens !== undefined) {
-      delete entry.totalTokens;
-      updated = true;
-    }
-    if (entry.totalTokensFresh !== undefined) {
-      delete entry.totalTokensFresh;
-      updated = true;
-    }
-    if (entry.cacheRead !== undefined) {
-      delete entry.cacheRead;
-      updated = true;
-    }
-    if (entry.cacheWrite !== undefined) {
-      delete entry.cacheWrite;
-      updated = true;
-    }
-    if (entry.systemPromptReport !== undefined) {
-      delete entry.systemPromptReport;
-      updated = true;
-    }
-    if (nextContextTokens !== undefined) {
-      if (entry.contextTokens !== nextContextTokens) {
-        entry.contextTokens = nextContextTokens;
-        updated = true;
-      }
-    } else if (
-      entry.contextTokens !== undefined &&
-      (selectionUpdated || (runtimePresent && !runtimeAligned))
-    ) {
-      delete entry.contextTokens;
-      updated = true;
-    }
+  if (
+    entry.contextTokens !== undefined &&
+    (selectionUpdated || (runtimePresent && !runtimeAligned))
+  ) {
+    delete entry.contextTokens;
+    updated = true;
   }
 
   if (profileOverride) {
