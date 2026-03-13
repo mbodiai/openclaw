@@ -561,6 +561,15 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     tui.requestRender();
   };
 
+  const popQueue = (): string | undefined => {
+    const popped = queuedMessages.pop();
+    if (popped !== undefined) {
+      chatLog.addSystem(`recalled queued message (${queuedMessages.length} left)`);
+      tui.requestRender();
+    }
+    return popped;
+  };
+
   const clearQueue = () => {
     const dropped = queuedMessages.length;
     queuedMessages.length = 0;
@@ -574,6 +583,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     sendMessage,
     flushQueuedMessage,
     clearQueue,
+    popQueue,
     openModelSelector,
     openAgentSelector,
     openSessionSelector,
