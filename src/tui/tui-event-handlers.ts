@@ -68,7 +68,6 @@ export function createEventHandlers(context: EventHandlerContext) {
     setThinkingPreview,
     setActiveToolName,
   } = context;
-  const LOCAL_NO_OUTPUT_HISTORY_FALLBACK_DELAYS_MS = [200, 1000];
   const finalizedRuns = new Map<string, number>();
   const sessionRuns = new Map<string, number>();
   const noOutputFallbackTimers = new Map<string, NodeJS.Timeout[]>();
@@ -305,7 +304,6 @@ export function createEventHandlers(context: EventHandlerContext) {
       );
       const suppressEmptyExternalPlaceholder =
         isNoOutputAssistantText(finalText) && !isLocalRunId?.(evt.runId);
-      const isLocalRun = isLocalRunId?.(evt.runId) ?? false;
       if (suppressEmptyExternalPlaceholder) {
         chatLog.dropAssistant(evt.runId);
       } else {

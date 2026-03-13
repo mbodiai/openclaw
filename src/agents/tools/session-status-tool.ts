@@ -25,7 +25,7 @@ import {
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
 import { resolvePreferredSessionKeyForSessionIdMatches } from "../../sessions/session-id-resolution.js";
 import { resolveAgentDir } from "../agent-scope.js";
-import { resolveSessionContextTokensForModel } from "../context.js";
+import { resolveContextTokensForModel } from "../context.js";
 import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
 import { resolveModelAuthLabel } from "../model-auth-label.js";
 import { loadModelCatalog } from "../model-catalog.js";
@@ -354,7 +354,7 @@ export function createSessionStatusTool(opts?: {
                   model: selection.model,
                   isDefault: selection.isDefault,
                 },
-          contextTokens: resolveSessionContextTokensForModel({
+          contextTokens: resolveContextTokensForModel({
             cfg,
             provider: selection.kind === "reset" ? configured.provider : selection.provider,
             model: selection.kind === "reset" ? configured.model : selection.model,

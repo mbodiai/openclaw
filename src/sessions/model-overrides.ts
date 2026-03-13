@@ -9,6 +9,7 @@ export type ModelOverrideSelection = {
 export function applyModelOverrideToSessionEntry(params: {
   entry: SessionEntry;
   selection: ModelOverrideSelection;
+  contextTokens?: number;
   profileOverride?: string;
   profileOverrideSource?: "auto" | "user";
 }): { updated: boolean } {
@@ -62,14 +63,18 @@ export function applyModelOverrideToSessionEntry(params: {
   }
 
   // contextTokens are derived from the active session model. When the selected
-  // model changes (or runtime model is already stale), the cached window can
-  // pin the session to an older/smaller limit until another run refreshes it.
-  if (
-    entry.contextTokens !== undefined &&
-    (selectionUpdated || (runtimePresent && !runtimeAligned))
-  ) {
-    delete entry.contextTokens;
-    updated = true;
+  // model changes (or runtime model is already stale), update or clear the
+  // cached window so the session reflects the new model immediately.
+  if (selectionUpdated || (runtimePresent && !runtimeAligned)) {
+    if (params.contextTokens !== undefined) {
+      if (entry.contextTokens !== params.contextTokens) {
+        entry.contextTokens = params.contextTokens;
+        updated = true;
+      }
+    } else if (entry.contextTokens !== undefined) {
+      delete entry.contextTokens;
+      updated = true;
+    }
   }
 
   if (profileOverride) {
