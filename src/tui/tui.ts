@@ -527,6 +527,8 @@ export async function runTui(opts: TuiOptions) {
 
   const tui = new TUI(new ProcessTerminal());
   const dedupeBackspace = createBackspaceDeduper();
+  tui.setClearOnShrink(false);
+
   tui.addInputListener((data) => {
     const next = dedupeBackspace(data);
     if (next.length === 0) {
