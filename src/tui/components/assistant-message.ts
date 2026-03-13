@@ -1,5 +1,6 @@
-import { Container, Spacer, Text, Markdown } from "@mariozechner/pi-tui";
+import { Component, Container, Markdown, Spacer } from "@mariozechner/pi-tui";
 import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
+import { stripAnsi } from "../../terminal/ansi.js";
 import { markdownTheme, theme } from "../theme/theme.js";
 import { HyperlinkMarkdown } from "./hyperlink-markdown.js";
 
@@ -66,15 +67,74 @@ export function setVerboseFullMode(value: boolean) {
   verboseFullMode = value;
 }
 
+class ThinkingWrapper implements Component {
+  private markdown: Markdown;
+  private lastText: string = "";
+  private cachedWidth: number | undefined;
+  private cachedLines: string[] | undefined;
+
+  constructor() {
+    this.markdown = new Markdown("", 0, 0, markdownTheme, {
+      color: (line) => theme.dim(line),
+    });
+  }
+
+  setText(text: string) {
+    if (this.lastText !== text) {
+      this.lastText = text;
+      this.markdown.setText(text);
+      this.invalidate();
+    }
+  }
+
+  invalidate() {
+    this.cachedWidth = undefined;
+    this.cachedLines = undefined;
+    this.markdown.invalidate();
+  }
+
+  render(width: number): string[] {
+    if (this.cachedLines && this.cachedWidth === width) {
+      return this.cachedLines;
+    }
+
+    if (!this.lastText) {
+      this.cachedWidth = width;
+      this.cachedLines = [];
+      return [];
+    }
+
+    // Render markdown content, subtracting width for the left border '│  '
+    const innerWidth = Math.max(1, width - 3);
+    const innerLines = this.markdown.render(innerWidth);
+
+    const result: string[] = [];
+
+    // Top border
+    result.push(theme.dim("╭─ ") + theme.bold(theme.dim("Thinking")));
+
+    // Middle lines with left border
+    for (const line of innerLines) {
+      result.push(theme.dim("│  ") + line);
+    }
+
+    // Bottom border
+    result.push(theme.dim("╰─"));
+    result.push(""); // Spacing after block
+
+    this.cachedWidth = width;
+    this.cachedLines = result;
+    return result;
+  }
+}
+
 export class AssistantMessageComponent extends Container {
-  private thinking: Markdown;
+  private thinking: ThinkingWrapper;
   private body: HyperlinkMarkdown;
 
   constructor(text: string) {
     super();
-    this.thinking = new Markdown("", 1, 0, markdownTheme, {
-      color: (line) => theme.dim(line)
-    });
+    this.thinking = new ThinkingWrapper();
     this.body = new HyperlinkMarkdown("", 1, 0, markdownTheme, {
       // Keep assistant body text in terminal default foreground so contrast
       // follows the user's terminal theme (dark or light).
@@ -95,35 +155,25 @@ export class AssistantMessageComponent extends Container {
   refresh() {
     const text = (this as { _rawText?: string })._rawText || "";
     const { thinking, content } = splitThinkingPrefix(text);
+
     if (thinking && thinkingVisible) {
-      const normalized = normalizeThinkingForUi(thinking);
       const expanded = thinkingExpandedView || verboseFullMode;
-      const actualThinking = expanded ? thinking.trim() : compactThinkingForUi(thinking.replace(/\s+/g, " "));
-      const lines = actualThinking.split("\n");
-      // If using Markdown component, just prepend the blockquote style or pass it directly.
-      // But we need the specific border style. The pi-tui Markdown component will just render the text. 
-      // Let's strip ANSI from the raw text first.
-      const cleanThinking = actualThinking.replace(/\x1B\[\d+;?\d*m/g, "");
-      
-      // Instead of manual lines, we can just use the Markdown component and give it standard markdown quotes or headers. 
-      // But to match the EXACT screenshot design, we'll manually apply chalk formatting to bold text since `pi-tui` Text component doesn't parse Markdown unless we use the Markdown component. 
-      // We changed `this.thinking` to `Markdown`. The `Markdown` component WILL parse `**bold**` natively!
-      // But we need to inject the borders on every line. 
-      // A hack is to format it first, but Markdown parsing might mess up the borders.
-      // The safest way to preserve Markdown parsing AND the borders is to use a Box or render Markdown and wrap it, but pi-tui Box doesn't have partial borders.
-      
-      const formatted = cleanThinking.split("\n").map((line: string) => `│  ${line}`).join("\n");
-      this.thinking.setText(`╭─ Thinking\n${formatted}\n╰─\n`);
+      const actualThinking = expanded
+        ? normalizeThinkingForUi(thinking)
+        : compactThinkingForUi(thinking.replace(/\s+/g, " "));
+
+      const cleanThinking = stripAnsi(actualThinking);
+      this.thinking.setText(cleanThinking);
     } else {
       this.thinking.setText("");
     }
+
     const bodyText = content || (thinking ? "" : text);
     const cleanedBodyText = stripReasoningTagsFromText(bodyText, {
       mode: "preserve",
       trim: "both",
     }).replace(/<\/?final>/g, "");
-    this.body.setText(`**Agent**
 
-` + cleanedBodyText);
+    this.body.setText(`**Agent**\n\n` + cleanedBodyText);
   }
 }
