@@ -280,11 +280,9 @@ export class ToolExecutionComponent extends Container {
 
     const argLine = formatArgs(this.toolName, this.args);
     if (argLine) {
-      const timeline = `timeline: start → args${this.updateCount > 0 ? ` → updates x${this.updateCount}` : ""}${this.isPartial ? "" : " → result"}`;
-      this.argsLine.setText(theme.dim(`${timeline} | ${argLine}`));
+      this.argsLine.setText(theme.dim(argLine));
     } else if (this.isPartial || this.updateCount > 0) {
-      const timeline = `timeline: start → args${this.updateCount > 0 ? ` → updates x${this.updateCount}` : ""}${this.isPartial ? "" : " → result"}`;
-      this.argsLine.setText(theme.dim(timeline));
+      this.argsLine.setText("");
     } else {
       this.argsLine.setText("");
     }
