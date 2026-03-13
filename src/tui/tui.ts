@@ -374,6 +374,8 @@ export async function runTui(opts: TuiOptions) {
   let thinkingExpanded = true;
   let thinkingPreviewDebounceTimer: NodeJS.Timeout | null = null;
   let statusTimeout: NodeJS.Timeout | null = null;
+  let flashTimeout: NodeJS.Timeout | null = null;
+  let preFlashStatus: string | null = null;
   let statusTimer: NodeJS.Timeout | null = null;
   let statusStartedAt: number | null = null;
   let lastActivityStatus = activityStatus;
@@ -817,6 +819,24 @@ export async function runTui(opts: TuiOptions) {
     renderStatus();
   };
 
+  // Briefly show a status message then restore the previous status.
+  // Avoids killing the spinner when the agent is busy.
+  const flashActivityStatus = (text: string, durationMs = 800) => {
+    if (flashTimeout) {
+      clearTimeout(flashTimeout);
+    }
+    if (preFlashStatus === null) {
+      preFlashStatus = activityStatus;
+    }
+    setActivityStatus(text);
+    flashTimeout = setTimeout(() => {
+      flashTimeout = null;
+      const restore = preFlashStatus ?? "idle";
+      preFlashStatus = null;
+      setActivityStatus(restore);
+    }, durationMs);
+  };
+
   const setInputHint = (text: string | null) => {
     inputHint = text;
     renderStatus();
@@ -1055,7 +1075,7 @@ export async function runTui(opts: TuiOptions) {
   editor.onCtrlO = () => {
     toolsExpanded = !toolsExpanded;
     chatLog.setToolsExpanded(toolsExpanded);
-    setActivityStatus(toolsExpanded ? "tools expanded" : "tools collapsed");
+    flashActivityStatus(toolsExpanded ? "tools expanded" : "tools collapsed");
     tui.requestRender();
   };
   editor.onCtrlL = () => {
@@ -1070,7 +1090,8 @@ export async function runTui(opts: TuiOptions) {
   editor.onCtrlT = () => {
     showThinking = !showThinking;
     setThinkingVisibleView(showThinking);
-    setActivityStatus(showThinking ? "thinking visible" : "thinking hidden");
+    flashActivityStatus(showThinking ? "thinking visible" : "thinking hidden");
+    chatLog.refreshAssistantMessages();
     tui.requestRender();
   };
 
@@ -1078,7 +1099,7 @@ export async function runTui(opts: TuiOptions) {
     const next = !thinkingExpanded;
     setThinkingExpanded(next);
     setThinkingExpandedView(next);
-    setActivityStatus(next ? "thinking expanded" : "thinking compact");
+    flashActivityStatus(next ? "thinking expanded" : "thinking compact");
     chatLog.refreshAssistantMessages();
     tui.requestRender();
   };
