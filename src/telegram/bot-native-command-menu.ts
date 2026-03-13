@@ -102,6 +102,8 @@ export function syncTelegramMenuCommands(params: {
   bot: Bot;
   runtime: RuntimeEnv;
   commandsToRegister: TelegramMenuCommand[];
+  accountId?: string;
+  botIdentity?: string;
 }): void {
   const { bot, runtime, commandsToRegister } = params;
   const sync = async () => {
