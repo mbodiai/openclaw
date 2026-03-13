@@ -23,11 +23,7 @@ function splitThinkingPrefix(text: string) {
 }
 
 function normalizeThinkingForUi(text: string) {
-  return text
-    .replace(/\*\*/g, "")
-    .replace(/^\s*\*\s*/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return text.trim();
 }
 
 function compactThinkingForUi(text: string, maxLen = 300) {
@@ -42,7 +38,8 @@ function compactThinkingForUi(text: string, maxLen = 300) {
   const parts = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
   let result = "";
   for (let i = parts.length - 1; i >= 0; i--) {
-    const candidate = parts.slice(i).join(" ");
+    const candidate = parts.slice(i).join("
+");
     if (candidate.length <= maxLen) {
       result = candidate;
     } else {
@@ -100,8 +97,17 @@ export class AssistantMessageComponent extends Container {
     if (thinking && thinkingVisible) {
       const normalized = normalizeThinkingForUi(thinking);
       const expanded = thinkingExpandedView || verboseFullMode;
-      const shown = expanded ? normalized : compactThinkingForUi(normalized);
-      this.thinking.setText(theme.dim(theme.italic(`thinking ... ${shown || normalized}`)));
+      const actualThinking = expanded ? thinking.trim() : compactThinkingForUi(thinking.replace(/\s+/g, " "));
+      const lines = actualThinking.split("\n");
+      // Use a subtle dim gray vertical bar for the thinking block
+      // Use a thick subtle bar like Claude Code does for thinking
+      const borderChar = theme.dim("┃");
+      const formatted = lines.map(line => `${borderChar} ${theme.dim(line)}`).join("
+");
+      this.thinking.setText(`${theme.dim("💭 Thinking")}
+${formatted}
+
+`);
     } else {
       this.thinking.setText("");
     }

@@ -1012,7 +1012,6 @@ export async function runTui(opts: TuiOptions) {
     promptHistory,
     getSessionKey: () => state.currentSessionKey,
     handleCommand,
-    popQueue,
 
     sendMessage,
     handleBangLine: runLocalShellLine,
@@ -1115,7 +1114,7 @@ export async function runTui(opts: TuiOptions) {
   editor.onCtrlT = () => {
     showThinking = !showThinking;
     setThinkingVisibleView(showThinking);
-    chatLog.refreshAssistantMessages();
+    setActivityStatus(showThinking ? "thinking visible" : "thinking hidden");
     tui.requestRender();
   };
 

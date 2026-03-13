@@ -196,6 +196,12 @@ const requireRunningSessionId = (result: { details: unknown }) => {
   return requireSessionId(result.details as { sessionId?: string });
 };
 
+describe("sanitizeBinaryOutput", () => {
+  it("removes full ANSI escape sequences instead of leaving sgr fragments", () => {
+    expect(sanitizeBinaryOutput("\u001b[32mgreen\u001b[39m ok")).toBe("green ok");
+  });
+});
+
 function hasNotifyEventForPrefix(prefix: string): boolean {
   return peekSystemEvents(DEFAULT_NOTIFY_SESSION_KEY).some((event) => event.includes(prefix));
 }

@@ -144,8 +144,13 @@ export function detectRuntimeShell(): string | undefined {
   return undefined;
 }
 
+const ANSI_ESCAPE_SEQUENCE_RE =
+  /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001B]*(?:\u0007|\u001B\\))/gu;
+
 export function sanitizeBinaryOutput(text: string): string {
-  const scrubbed = text.replace(/[\p{Format}\p{Surrogate}]/gu, "");
+  const scrubbed = text
+    .replace(ANSI_ESCAPE_SEQUENCE_RE, "")
+    .replace(/[\p{Format}\p{Surrogate}]/gu, "");
   if (!scrubbed) {
     return scrubbed;
   }
