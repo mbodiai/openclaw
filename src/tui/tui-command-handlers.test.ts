@@ -19,6 +19,7 @@ function createHarness(params?: {
   const addUser = vi.fn();
   const addSystem = vi.fn();
   const requestRender = vi.fn();
+  const queueContainer = { addChild: vi.fn(), clear: vi.fn() };
   const loadHistory =
     params?.loadHistory ?? (vi.fn().mockResolvedValue(undefined) as LoadHistoryMock);
   const setActivityStatus = params?.setActivityStatus ?? (vi.fn() as SetActivityStatusMock);
@@ -26,6 +27,7 @@ function createHarness(params?: {
   const { handleCommand } = createCommandHandlers({
     client: { sendChat, resetSession } as never,
     chatLog: { addUser, addSystem } as never,
+    queueContainer,
     tui: { requestRender } as never,
     opts: {},
     state: {
@@ -59,6 +61,7 @@ function createHarness(params?: {
     addSystem,
     requestRender,
     loadHistory,
+    queueContainer,
     setActivityStatus,
   };
 }
@@ -179,6 +182,7 @@ describe("tui command handlers", () => {
     const { handleCommand } = createCommandHandlers({
       client: { patchSession } as never,
       chatLog: { addUser: vi.fn(), addSystem } as never,
+      queueContainer: { addChild: vi.fn(), clear: vi.fn() },
       tui: { requestRender: vi.fn() } as never,
       opts: {},
       state: {
@@ -218,6 +222,7 @@ describe("tui command handlers", () => {
     const addUser = vi.fn();
     const addSystem = vi.fn();
     const requestRender = vi.fn();
+    const queueContainer = { addChild: vi.fn(), clear: vi.fn() };
     const setActivityStatus = vi.fn();
     const state: Record<string, unknown> = {
       currentSessionKey: "agent:main:main",
@@ -229,6 +234,7 @@ describe("tui command handlers", () => {
     const { sendMessage, flushQueuedMessage } = createCommandHandlers({
       client: { sendChat } as never,
       chatLog: { addUser, addSystem } as never,
+      queueContainer,
       tui: { requestRender } as never,
       opts: {},
       state: state as never,
@@ -254,8 +260,9 @@ describe("tui command handlers", () => {
     expect(sendChat).not.toHaveBeenCalled();
     expect(addUser).toHaveBeenNthCalledWith(1, "first queued");
     expect(addUser).toHaveBeenNthCalledWith(2, "second queued");
-    expect(addSystem).toHaveBeenNthCalledWith(1, "queued (1)");
-    expect(addSystem).toHaveBeenNthCalledWith(2, "queued (2)");
+    expect(addSystem).not.toHaveBeenCalled();
+    expect(queueContainer.clear).toHaveBeenCalled();
+    expect(queueContainer.addChild).toHaveBeenCalled();
 
     state.activeChatRunId = null;
     await flushQueuedMessage();
@@ -263,7 +270,6 @@ describe("tui command handlers", () => {
       1,
       expect.objectContaining({ message: "first queued", sessionKey: "agent:main:main" }),
     );
-    expect(addSystem).toHaveBeenCalledWith("sending queued message (1 left)");
 
     state.activeChatRunId = null;
     await flushQueuedMessage();

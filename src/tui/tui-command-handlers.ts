@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Component, SelectItem, TUI } from "@mariozechner/pi-tui";
+import { Text, type Component, type SelectItem, type TUI } from "@mariozechner/pi-tui";
 import {
   formatThinkingLevels,
   normalizeReasoningLevel,
@@ -18,6 +18,7 @@ import {
 } from "./components/selectors.js";
 import type { GatewayChatClient } from "./gateway-chat.js";
 import { sanitizeRenderableText } from "./tui-formatters.js";
+import { theme } from "./theme/theme.js";
 import { formatStatusSummary } from "./tui-status-summary.js";
 import type {
   AgentSummary,
@@ -29,6 +30,10 @@ import type {
 type CommandHandlerContext = {
   client: GatewayChatClient;
   chatLog: ChatLog;
+  queueContainer: {
+    addChild: (child: Component) => void;
+    clear: () => void;
+  };
   tui: TUI;
   opts: TuiOptions;
   state: TuiStateAccess;
@@ -52,6 +57,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
   const {
     client,
     chatLog,
+    queueContainer,
     tui,
     opts,
     state,
@@ -234,6 +240,17 @@ export function createCommandHandlers(context: CommandHandlerContext) {
   };
 
   const queuedMessages: string[] = [];
+  const formatQueuedPreview = (message: string) =>
+    message.length > 40 ? `${message.slice(0, 37)}...` : message;
+
+  const updateQueueDisplay = () => {
+    queueContainer.clear();
+    if (queuedMessages.length > 0) {
+      const queuedPreviews = queuedMessages.map(formatQueuedPreview);
+      queueContainer.addChild(new Text(theme.dim(`[queued: ${queuedPreviews.join(" | ")}]`), 1, 0));
+    }
+    tui.requestRender();
+  };
 
   const sendMessageNow = async (text: string, options?: { addToChatLog?: boolean }) => {
     if (!state.isConnected) {
@@ -276,7 +293,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
     if (state.activeChatRunId) {
       queuedMessages.push(text);
       chatLog.addUser(text);
-      chatLog.addSystem(`queued (${queuedMessages.length})`);
+      updateQueueDisplay();
       tui.requestRender();
       return;
     }
@@ -288,12 +305,10 @@ export function createCommandHandlers(context: CommandHandlerContext) {
       return false;
     }
     const next = queuedMessages.shift();
+    updateQueueDisplay();
+
     if (!next) {
       return false;
-    }
-    const remaining = queuedMessages.length;
-    if (remaining > 0) {
-      chatLog.addSystem(`sending queued message (${remaining} left)`);
     }
     await sendMessageNow(next, { addToChatLog: false });
     return true;
@@ -563,19 +578,19 @@ export function createCommandHandlers(context: CommandHandlerContext) {
 
   const popQueue = (): string | undefined => {
     const popped = queuedMessages.pop();
-    if (popped !== undefined) {
-      chatLog.addSystem(`recalled queued message (${queuedMessages.length} left)`);
-      tui.requestRender();
-    }
+    updateQueueDisplay();
     return popped;
   };
 
   const clearQueue = () => {
     const dropped = queuedMessages.length;
     queuedMessages.length = 0;
+    updateQueueDisplay();
+
     if (dropped > 0) {
       chatLog.addSystem(`dropped ${dropped} queued message${dropped > 1 ? "s" : ""}`);
     }
+    tui.requestRender();
   };
 
   return {
