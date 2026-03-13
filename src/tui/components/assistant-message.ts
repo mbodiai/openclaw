@@ -1,4 +1,5 @@
 import { Container, Spacer, Text } from "@mariozechner/pi-tui";
+import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
 import { markdownTheme, theme } from "../theme/theme.js";
 import { HyperlinkMarkdown } from "./hyperlink-markdown.js";
 
@@ -104,6 +105,11 @@ export class AssistantMessageComponent extends Container {
     } else {
       this.thinking.setText("");
     }
-    this.body.setText(content || (thinking ? "" : text));
+    const bodyText = content || (thinking ? "" : text);
+    const cleanedBodyText = stripReasoningTagsFromText(bodyText, {
+      mode: "preserve",
+      trim: "both",
+    }).replace(/<\/?final>/g, "");
+    this.body.setText(cleanedBodyText);
   }
 }
