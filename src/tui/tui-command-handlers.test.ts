@@ -251,14 +251,11 @@ describe("tui command handlers", () => {
     const addSystem = vi.fn();
     const requestRender = vi.fn();
     const setActivityStatus = vi.fn();
-    const state: {
-      currentSessionKey: string;
-      activeChatRunId: string | null;
-      sessionInfo: Record<string, never>;
-    } = {
+    const state: Record<string, unknown> = {
       currentSessionKey: "agent:main:main",
       activeChatRunId: "active-run",
       sessionInfo: {},
+      isConnected: true,
     };
 
     const { sendMessage, flushQueuedMessage } = createCommandHandlers({
@@ -280,6 +277,7 @@ describe("tui command handlers", () => {
       applySessionInfoFromPatch: vi.fn(),
       noteLocalRunId: vi.fn(),
       forgetLocalRunId: vi.fn(),
+      requestExit: vi.fn(),
     });
 
     await sendMessage("first queued");
