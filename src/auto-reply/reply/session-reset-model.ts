@@ -1,3 +1,4 @@
+import { resolveSessionContextTokensForModel } from "../../agents/context.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import {
   buildAllowedModelSet,
@@ -58,19 +59,26 @@ function buildSelectionFromExplicit(params: {
 }
 
 function applySelectionToSession(params: {
+  cfg: OpenClawConfig;
   selection: ModelDirectiveSelection;
   sessionEntry?: SessionEntry;
   sessionStore?: Record<string, SessionEntry>;
   sessionKey?: string;
   storePath?: string;
 }) {
-  const { selection, sessionEntry, sessionStore, sessionKey, storePath } = params;
+  const { cfg, selection, sessionEntry, sessionStore, sessionKey, storePath } = params;
   if (!sessionEntry || !sessionStore || !sessionKey) {
     return;
   }
+  const contextTokens = resolveSessionContextTokensForModel({
+    cfg,
+    provider: selection.provider,
+    model: selection.model,
+  });
   const { updated } = applyModelOverrideToSessionEntry({
     entry: sessionEntry,
     selection,
+    contextTokens,
   });
   if (!updated) {
     return;
@@ -189,6 +197,7 @@ export async function applyResetModelOverride(params: {
   params.sessionCtx.BodyForCommands = cleanedBody;
 
   applySelectionToSession({
+    cfg: params.cfg,
     selection,
     sessionEntry: params.sessionEntry,
     sessionStore: params.sessionStore,

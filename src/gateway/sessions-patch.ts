@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { resolveSessionContextTokensForModel } from "../agents/context.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
 import {
   resolveAllowedModelRef,
@@ -376,6 +377,11 @@ export async function applySessionsPatchToStore(params: {
   if ("model" in patch) {
     const raw = patch.model;
     if (raw === null) {
+      const contextTokens = resolveSessionContextTokensForModel({
+        cfg,
+        provider: resolvedDefault.provider,
+        model: resolvedDefault.model,
+      });
       applyModelOverrideToSessionEntry({
         entry: next,
         selection: {
@@ -383,6 +389,7 @@ export async function applySessionsPatchToStore(params: {
           model: resolvedDefault.model,
           isDefault: true,
         },
+        contextTokens,
       });
     } else if (raw !== undefined) {
       const trimmed = String(raw).trim();
@@ -406,9 +413,18 @@ export async function applySessionsPatchToStore(params: {
       if ("error" in resolved) {
         return invalid(resolved.error);
       }
+      const catalogEntry = catalog.find(
+        (entry) => entry.provider === resolved.ref.provider && entry.id === resolved.ref.model,
+      );
       const isDefault =
         resolved.ref.provider === resolvedDefault.provider &&
         resolved.ref.model === resolvedDefault.model;
+      const contextTokens = resolveSessionContextTokensForModel({
+        cfg,
+        provider: resolved.ref.provider,
+        model: resolved.ref.model,
+        fallbackContextTokens: catalogEntry?.contextWindow,
+      });
       applyModelOverrideToSessionEntry({
         entry: next,
         selection: {
@@ -416,6 +432,7 @@ export async function applySessionsPatchToStore(params: {
           model: resolved.ref.model,
           isDefault,
         },
+        contextTokens,
       });
     }
   }

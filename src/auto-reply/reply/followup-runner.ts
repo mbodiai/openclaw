@@ -15,7 +15,7 @@ import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
-import { resolveRunAuthProfile } from "./agent-runner-utils.js";
+import { resolveModelFallbackOptions, resolveRunAuthProfile } from "./agent-runner-utils.js";
 import {
   resolveOriginAccountId,
   resolveOriginMessageProvider,
@@ -156,16 +156,8 @@ export function createFollowupRunner(params: {
       );
       try {
         const fallbackResult = await runWithModelFallback({
-          cfg: queued.run.config,
-          provider: queued.run.provider,
-          model: queued.run.model,
+          ...resolveModelFallbackOptions(queued.run),
           runId,
-          agentDir: queued.run.agentDir,
-          fallbacksOverride: resolveRunModelFallbacksOverride({
-            cfg: queued.run.config,
-            agentId: queued.run.agentId,
-            sessionKey: queued.run.sessionKey,
-          }),
           run: async (provider, model, runOptions) => {
             const authProfile = resolveRunAuthProfile(queued.run, provider);
             const result = await runEmbeddedPiAgent({

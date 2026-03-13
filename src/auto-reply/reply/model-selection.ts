@@ -1,6 +1,5 @@
 import { clearSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
-import { lookupContextTokens } from "../../agents/context.js";
-import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
+import { resolveSessionContextTokensForModel } from "../../agents/context.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import {
   buildAllowedModelSet,
@@ -331,6 +330,11 @@ export async function createModelSelectionState(params: {
         const { updated } = applyModelOverrideToSessionEntry({
           entry: sessionEntry,
           selection: { provider: defaultProvider, model: defaultModel, isDefault: true },
+          contextTokens: resolveSessionContextTokensForModel({
+            cfg,
+            provider: defaultProvider,
+            model: defaultModel,
+          }),
         });
         if (updated) {
           sessionStore[sessionKey] = sessionEntry;
@@ -602,9 +606,12 @@ export function resolveModelDirectiveSelection(params: {
 
 export function resolveContextTokens(params: {
   agentCfg: NonNullable<NonNullable<OpenClawConfig["agents"]>["defaults"]> | undefined;
+  provider?: string;
   model: string;
 }): number {
-  return (
-    params.agentCfg?.contextTokens ?? lookupContextTokens(params.model) ?? DEFAULT_CONTEXT_TOKENS
-  );
+  return resolveSessionContextTokensForModel({
+    provider: params.provider,
+    model: params.model,
+    contextTokensOverride: params.agentCfg?.contextTokens,
+  });
 }
