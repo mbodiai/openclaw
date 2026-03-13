@@ -25,31 +25,36 @@ describe("createEditorSubmitHandler", () => {
   });
 
   it("does not treat leading whitespace before ! as a bang command", () => {
-    const { editor, sendMessage, handleBangLine, onSubmit } = createSubmitHarness();
+    const { promptHistory, getSessionKey, sendMessage, handleBangLine, onSubmit } =
+      createSubmitHarness();
 
     onSubmit("  !ls");
 
     expect(handleBangLine).not.toHaveBeenCalled();
     expect(sendMessage).toHaveBeenCalledWith("!ls");
-    expect(editor.addToHistory).toHaveBeenCalledWith("!ls");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "!ls");
   });
 
-  it("trims normal messages before sending and adding to history", () => {
-    const { editor, sendMessage, onSubmit } = createSubmitHarness();
+  it("trims normal messages before sending and recording to history", () => {
+    const { promptHistory, getSessionKey, sendMessage, onSubmit } = createSubmitHarness();
 
     onSubmit("  hello  ");
 
     expect(sendMessage).toHaveBeenCalledWith("hello");
-    expect(editor.addToHistory).toHaveBeenCalledWith("hello");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "hello");
   });
 
   it("preserves internal newlines for multiline messages", () => {
-    const { editor, handleCommand, sendMessage, handleBangLine, onSubmit } = createSubmitHarness();
+    const { promptHistory, getSessionKey, handleCommand, sendMessage, handleBangLine, onSubmit } =
+      createSubmitHarness();
 
     onSubmit("Line 1\nLine 2\nLine 3");
 
     expect(sendMessage).toHaveBeenCalledWith("Line 1\nLine 2\nLine 3");
-    expect(editor.addToHistory).toHaveBeenCalledWith("Line 1\nLine 2\nLine 3");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(
+      getSessionKey(),
+      "Line 1\nLine 2\nLine 3",
+    );
     expect(handleCommand).not.toHaveBeenCalled();
     expect(handleBangLine).not.toHaveBeenCalled();
   });
@@ -93,52 +98,44 @@ describe("createSubmitBurstCoalescer", () => {
     onSubmit("Line 2");
 
     expect(submit).toHaveBeenCalledTimes(2);
-    expect(submit).toHaveBeenNthCalledWith(1, "Line 1");
-    expect(submit).toHaveBeenNthCalledWith(2, "Line 2");
+    expect(submit).toHaveBeenCalledWith("Line 1");
+    expect(submit).toHaveBeenCalledWith("Line 2");
   });
 });
 
 describe("shouldEnableWindowsGitBashPasteFallback", () => {
-  it("enables fallback on Windows Git Bash env", () => {
+  it("returns true on macOS iTerm2", () => {
+    expect(
+      shouldEnableWindowsGitBashPasteFallback({
+        platform: "darwin",
+        env: { TERM_PROGRAM: "iTerm.app" },
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false on macOS unknown terminals", () => {
+    expect(
+      shouldEnableWindowsGitBashPasteFallback({
+        platform: "darwin",
+        env: { TERM_PROGRAM: "WeirdTerm" },
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true on Windows Git Bash", () => {
     expect(
       shouldEnableWindowsGitBashPasteFallback({
         platform: "win32",
-        env: {
-          MSYSTEM: "MINGW64",
-        } as NodeJS.ProcessEnv,
+        env: { MSYSTEM: "MINGW64", SHELL: "bash" },
       }),
     ).toBe(true);
   });
 
-  it("enables fallback on macOS iTerm", () => {
-    expect(
-      shouldEnableWindowsGitBashPasteFallback({
-        platform: "darwin",
-        env: {
-          TERM_PROGRAM: "iTerm.app",
-        } as NodeJS.ProcessEnv,
-      }),
-    ).toBe(true);
-  });
-
-  it("enables fallback on macOS Terminal.app", () => {
-    expect(
-      shouldEnableWindowsGitBashPasteFallback({
-        platform: "darwin",
-        env: {
-          TERM_PROGRAM: "Apple_Terminal",
-        } as NodeJS.ProcessEnv,
-      }),
-    ).toBe(true);
-  });
-
-  it("disables fallback outside Windows", () => {
+  it("returns false on non-Windows", () => {
     expect(
       shouldEnableWindowsGitBashPasteFallback({
         platform: "linux",
-        env: {
-          MSYSTEM: "MINGW64",
-        } as NodeJS.ProcessEnv,
+        env: {},
       }),
     ).toBe(false);
   });

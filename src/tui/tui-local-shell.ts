@@ -109,7 +109,8 @@ export function createLocalShellRunner(deps: LocalShellDeps) {
       const child = spawnCommand(cmd, {
         // Intentionally a shell: this is an operator-only local TUI feature (prefixed with `!`)
         // and is gated behind an explicit in-session approval prompt.
-        shell: true,
+        // Prefer the user's login shell when available (zsh/bash), instead of always /bin/sh.
+        shell: env.SHELL?.trim() || true,
         cwd: getCwd(),
         env: { ...env, OPENCLAW_SHELL: "tui-local" },
       });

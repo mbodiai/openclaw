@@ -2,56 +2,59 @@ import { describe, expect, it } from "vitest";
 import { createSubmitHarness } from "./tui-submit-test-helpers.js";
 
 describe("createEditorSubmitHandler", () => {
-  it("adds submitted messages to editor history", () => {
-    const { editor, onSubmit } = createSubmitHarness();
+  it("records submitted messages to prompt history", () => {
+    const { editor, promptHistory, getSessionKey, onSubmit } = createSubmitHarness();
 
     onSubmit("hello world");
 
     expect(editor.setText).toHaveBeenCalledWith("");
-    expect(editor.addToHistory).toHaveBeenCalledWith("hello world");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "hello world");
   });
 
-  it("trims input before adding to history", () => {
-    const { editor, onSubmit } = createSubmitHarness();
+  it("trims input before recording to prompt history", () => {
+    const { promptHistory, getSessionKey, onSubmit } = createSubmitHarness();
 
     onSubmit("   hi   ");
 
-    expect(editor.addToHistory).toHaveBeenCalledWith("hi");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "hi");
   });
 
-  it.each(["", "   "])("does not add blank submissions to history", (text) => {
-    const { editor, onSubmit } = createSubmitHarness();
+  it.each(["", "   "])("does not record blank submissions", (text) => {
+    const { promptHistory, onSubmit } = createSubmitHarness();
 
     onSubmit(text);
 
-    expect(editor.addToHistory).not.toHaveBeenCalled();
+    expect(promptHistory.noteSubmitted).not.toHaveBeenCalled();
   });
 
   it("routes slash commands to handleCommand", () => {
-    const { editor, handleCommand, sendMessage, onSubmit } = createSubmitHarness();
+    const { promptHistory, getSessionKey, handleCommand, sendMessage, onSubmit } =
+      createSubmitHarness();
 
     onSubmit("/models");
 
-    expect(editor.addToHistory).toHaveBeenCalledWith("/models");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "/models");
     expect(handleCommand).toHaveBeenCalledWith("/models");
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it("routes normal messages to sendMessage", () => {
-    const { editor, handleCommand, sendMessage, onSubmit } = createSubmitHarness();
+    const { promptHistory, getSessionKey, handleCommand, sendMessage, onSubmit } =
+      createSubmitHarness();
 
     onSubmit("hello");
 
-    expect(editor.addToHistory).toHaveBeenCalledWith("hello");
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "hello");
     expect(sendMessage).toHaveBeenCalledWith("hello");
     expect(handleCommand).not.toHaveBeenCalled();
   });
 
   it("routes bang-prefixed lines to handleBangLine", () => {
-    const { handleBangLine, onSubmit } = createSubmitHarness();
+    const { promptHistory, getSessionKey, handleBangLine, onSubmit } = createSubmitHarness();
 
     onSubmit("!ls");
 
+    expect(promptHistory.noteSubmitted).toHaveBeenCalledWith(getSessionKey(), "!ls");
     expect(handleBangLine).toHaveBeenCalledWith("!ls");
   });
 });

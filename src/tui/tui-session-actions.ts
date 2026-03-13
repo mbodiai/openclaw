@@ -25,6 +25,7 @@ type SessionActionContext = {
   updateAutocompleteProvider: () => void;
   setActivityStatus: (text: string) => void;
   clearLocalRunIds?: () => void;
+  onPromptHistorySeed?: (sessionKey: string, texts: string[]) => void;
   /** Called after loadHistory completes to replay buffered agent events. */
   onHistoryLoaded?: () => void;
 };
@@ -179,18 +180,14 @@ export function createSessionActions(context: SessionActionContext) {
     if (entry?.responseUsage !== undefined) {
       next.responseUsage = entry.responseUsage;
     }
-    if (entry?.inputTokens !== undefined) {
+    if (entry) {
       next.inputTokens = entry.inputTokens;
-    }
-    if (entry?.outputTokens !== undefined) {
       next.outputTokens = entry.outputTokens;
-    }
-    if (entry?.totalTokens !== undefined) {
       next.totalTokens = entry.totalTokens;
-    }
-    if (entry?.contextTokens !== undefined || defaults?.contextTokens !== undefined) {
       next.contextTokens =
-        entry?.contextTokens ?? defaults?.contextTokens ?? state.sessionInfo.contextTokens;
+        entry.contextTokens ?? defaults?.contextTokens ?? state.sessionInfo.contextTokens;
+    } else if (defaults?.contextTokens !== undefined) {
+      next.contextTokens = defaults.contextTokens;
     }
     if (entry?.displayName !== undefined) {
       next.displayName = entry.displayName;
@@ -301,6 +298,7 @@ export function createSessionActions(context: SessionActionContext) {
       const showTools = (state.sessionInfo.verboseLevel ?? "off") !== "off";
       chatLog.clearAll();
       chatLog.addSystem(`session ${state.currentSessionKey}`);
+      const promptSeed: string[] = [];
       // Collect tool call args from assistant messages so toolResult can display them.
       const toolCallArgs = new Map<string, { name: string; args: unknown }>();
       for (const entry of record.messages ?? []) {
@@ -319,12 +317,13 @@ export function createSessionActions(context: SessionActionContext) {
           const text = extractTextFromMessage(message);
           if (text) {
             chatLog.addUser(text);
+            promptSeed.push(text);
           }
           continue;
         }
         if (message.role === "assistant") {
           const text = extractTextFromMessage(message, {
-            includeThinking: state.showThinking,
+            includeThinking: true,
           });
           if (text) {
             chatLog.finalizeAssistant(text);
@@ -372,6 +371,7 @@ export function createSessionActions(context: SessionActionContext) {
           );
         }
       }
+      context.onPromptHistorySeed?.(state.currentSessionKey, promptSeed);
       state.historyLoaded = true;
     } catch (err) {
       chatLog.addSystem(`history failed: ${String(err)}`);
