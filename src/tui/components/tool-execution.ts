@@ -220,9 +220,10 @@ export class ToolExecutionComponent extends Container {
     this.args = args;
     this.startedAt = Date.now();
     this.box = new Box(1, 1, (line) => theme.toolPendingBg(line));
+
     this.header = new Text("", 0, 0);
     this.argsLine = new Text("", 0, 0);
-    this.output = new Markdown("", 0, 0, markdownTheme, {
+    this.output = new Markdown("", 1, 0, markdownTheme, {
       color: (line) => theme.toolOutput(line),
     });
     this.addChild(new Spacer(1));
@@ -275,12 +276,12 @@ export class ToolExecutionComponent extends Container {
     const badge = this.isPartial ? "running" : this.isError ? "error" : isCached ? "cached" : "ok";
     const family = resolveToolFamily(this.toolName);
     const elapsed = formatToolElapsed(this.startedAt, this.endedAt);
-    const title = `${display.emoji} ${display.label} [${badge}] [${family}] [${elapsed}]`;
+    const title = `${display.emoji} ${display.label} [${badge}] [${elapsed}]`;
     this.header.setText(colorFamily(theme.bold(title), family));
 
     const argLine = formatArgs(this.toolName, this.args);
     if (argLine) {
-      this.argsLine.setText(theme.dim(argLine));
+      this.argsLine.setText(theme.dim("  " + argLine));
     } else if (this.isPartial || this.updateCount > 0) {
       this.argsLine.setText("");
     } else {
@@ -299,9 +300,9 @@ export class ToolExecutionComponent extends Container {
       const lines = text.split("\n");
       const limit = diff ? PREVIEW_LINES * 2 : PREVIEW_LINES;
       const preview = lines.length > limit ? `${lines.slice(0, limit).join("\n")}\n…` : text;
-      this.output.setText(preview);
+      this.output.setText(preview ? "  " + preview.replace(/\n/g, "\n  ") : "");
     } else {
-      this.output.setText(text);
+      this.output.setText(text ? "  " + text.replace(/\n/g, "\n  ") : "");
     }
   }
 }
