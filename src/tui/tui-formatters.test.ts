@@ -80,6 +80,18 @@ describe("extractTextFromMessage", () => {
     expect(text).toBe("[thinking]\nponder\n[thinking_end]\n\nhello");
   });
 
+  it("splits tagged reasoning from string content when included", () => {
+    const text = extractTextFromMessage(
+      {
+        role: "assistant",
+        content: "Before <think>ponder</think>\n<final>Hello</final>",
+      },
+      { includeThinking: true },
+    );
+
+    expect(text).toBe("[thinking]\nponder\n[thinking_end]\n\nBefore \nHello");
+  });
+
   it("sanitizes ANSI and control chars from string content", () => {
     const text = extractTextFromMessage({
       role: "assistant",
@@ -87,6 +99,15 @@ describe("extractTextFromMessage", () => {
     });
 
     expect(text).toBe("Hello redworld");
+  });
+
+  it("strips provider special tokens from string content", () => {
+    const text = extractTextFromMessage({
+      role: "assistant",
+      content: "<|assistant|>Question<｜begin▁of▁sentence｜>Answer",
+    });
+
+    expect(text).toBe("Question Answer");
   });
 
   it("redacts heavily corrupted binary-like lines", () => {
@@ -180,6 +201,24 @@ describe("extractThinkingFromMessage", () => {
 
     expect(text).toBe("alpha\nbeta");
   });
+
+  it("collects tagged reasoning from string content", () => {
+    const text = extractThinkingFromMessage({
+      role: "assistant",
+      content: "Start<thought>alpha</thought>Middle<thinking>beta</thinking><final>done</final>",
+    });
+
+    expect(text).toBe("alpha\nbeta");
+  });
+
+  it("strips provider special tokens inside tagged reasoning", () => {
+    const text = extractThinkingFromMessage({
+      role: "assistant",
+      content: "<think><|assistant|>alpha</think><final>done</final>",
+    });
+
+    expect(text).toBe("alpha");
+  });
 });
 
 describe("extractContentFromMessage", () => {
@@ -193,6 +232,24 @@ describe("extractContentFromMessage", () => {
     });
 
     expect(text).toBe("hello");
+  });
+
+  it("drops tagged reasoning from string content and keeps final content", () => {
+    const text = extractContentFromMessage({
+      role: "assistant",
+      content: "Start<think>alpha</think>Middle<antthinking>beta</antthinking><final>done</final>",
+    });
+
+    expect(text).toBe("StartMiddledone");
+  });
+
+  it("strips final tags and provider special tokens from string content", () => {
+    const text = extractContentFromMessage({
+      role: "assistant",
+      content: "<|assistant|><final>Hello</final>",
+    });
+
+    expect(text).toBe("Hello");
   });
 
   it("renders error text when stopReason is error and content is not an array", () => {
