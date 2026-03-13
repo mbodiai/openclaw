@@ -1315,6 +1315,12 @@ export const chatHandlers: GatewayRequestHandlers = {
           images: parsedImages.length > 0 ? parsedImages : undefined,
           onAgentRunStart: (runId) => {
             agentRunStarted = true;
+            if (runId !== clientRunId) {
+              context.addChatRun(runId, {
+                sessionKey,
+                clientRunId,
+              });
+            }
             const connId = typeof client?.connId === "string" ? client.connId : undefined;
             const wantsToolEvents = hasGatewayClientCap(
               client?.connect?.caps,

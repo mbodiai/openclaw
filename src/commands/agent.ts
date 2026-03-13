@@ -20,6 +20,7 @@ import { clearSessionAuthProfileOverride } from "../agents/auth-profiles/session
 import { resolveBootstrapWarningSignaturesSeen } from "../agents/bootstrap-budget.js";
 import { runCliAgent } from "../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../agents/cli-session.js";
+import { resolveSessionContextTokensForModel } from "../agents/context.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { FailoverError } from "../agents/failover-error.js";
 import { formatAgentInternalEventsForPrompt } from "../agents/internal-events.js";
@@ -972,6 +973,11 @@ async function agentCommandInternal(
           const { updated } = applyModelOverrideToSessionEntry({
             entry,
             selection: { provider: defaultProvider, model: defaultModel, isDefault: true },
+            contextTokens: resolveSessionContextTokensForModel({
+              cfg,
+              provider: defaultProvider,
+              model: defaultModel,
+            }),
           });
           if (updated) {
             await persistSessionEntry({

@@ -2,24 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { SessionEntry } from "../config/sessions.js";
 import { applyModelOverrideToSessionEntry } from "./model-overrides.js";
 
-function applyOpenAiSelection(entry: SessionEntry) {
-  return applyModelOverrideToSessionEntry({
-    entry,
-    selection: {
-      provider: "openai",
-      model: "gpt-5.2",
-    },
-  });
-}
-
-function expectRuntimeModelFieldsCleared(entry: SessionEntry, before: number) {
-  expect(entry.providerOverride).toBe("openai");
-  expect(entry.modelOverride).toBe("gpt-5.2");
-  expect(entry.modelProvider).toBeUndefined();
-  expect(entry.model).toBeUndefined();
-  expect((entry.updatedAt ?? 0) > before).toBe(true);
-}
-
 describe("applyModelOverrideToSessionEntry", () => {
   it("clears stale runtime model fields when switching overrides", () => {
     const before = Date.now() - 5_000;
@@ -30,20 +12,63 @@ describe("applyModelOverrideToSessionEntry", () => {
       model: "claude-sonnet-4-6",
       providerOverride: "anthropic",
       modelOverride: "claude-sonnet-4-6",
-      contextTokens: 160_000,
       fallbackNoticeSelectedModel: "anthropic/claude-sonnet-4-6",
       fallbackNoticeActiveModel: "anthropic/claude-sonnet-4-6",
       fallbackNoticeReason: "provider temporary failure",
+      inputTokens: 111,
+      outputTokens: 22,
+      totalTokens: 133,
+      totalTokensFresh: true,
+      cacheRead: 7,
+      cacheWrite: 8,
+      contextTokens: 1_048_576,
+      systemPromptReport: {
+        source: "run",
+        generatedAt: before,
+        systemPrompt: {
+          chars: 1,
+          projectContextChars: 0,
+          nonProjectContextChars: 1,
+        },
+        injectedWorkspaceFiles: [],
+        skills: {
+          promptChars: 0,
+          entries: [],
+        },
+        tools: {
+          listChars: 0,
+          schemaChars: 0,
+          entries: [],
+        },
+      },
     };
 
-    const result = applyOpenAiSelection(entry);
+    const result = applyModelOverrideToSessionEntry({
+      entry,
+      selection: {
+        provider: "openai",
+        model: "gpt-5.2",
+      },
+      contextTokens: 200_000,
+    });
 
     expect(result.updated).toBe(true);
-    expectRuntimeModelFieldsCleared(entry, before);
-    expect(entry.contextTokens).toBeUndefined();
+    expect(entry.providerOverride).toBe("openai");
+    expect(entry.modelOverride).toBe("gpt-5.2");
+    expect(entry.modelProvider).toBeUndefined();
+    expect(entry.model).toBeUndefined();
+    expect(entry.inputTokens).toBeUndefined();
+    expect(entry.outputTokens).toBeUndefined();
+    expect(entry.totalTokens).toBeUndefined();
+    expect(entry.totalTokensFresh).toBeUndefined();
+    expect(entry.cacheRead).toBeUndefined();
+    expect(entry.cacheWrite).toBeUndefined();
+    expect(entry.contextTokens).toBe(200_000);
+    expect(entry.systemPromptReport).toBeUndefined();
     expect(entry.fallbackNoticeSelectedModel).toBeUndefined();
     expect(entry.fallbackNoticeActiveModel).toBeUndefined();
     expect(entry.fallbackNoticeReason).toBeUndefined();
+    expect((entry.updatedAt ?? 0) > before).toBe(true);
   });
 
   it("clears stale runtime model fields even when override selection is unchanged", () => {
@@ -55,14 +80,29 @@ describe("applyModelOverrideToSessionEntry", () => {
       model: "claude-sonnet-4-6",
       providerOverride: "openai",
       modelOverride: "gpt-5.2",
-      contextTokens: 160_000,
+      totalTokens: 100,
+      totalTokensFresh: false,
+      contextTokens: 1_048_576,
     };
 
-    const result = applyOpenAiSelection(entry);
+    const result = applyModelOverrideToSessionEntry({
+      entry,
+      selection: {
+        provider: "openai",
+        model: "gpt-5.2",
+      },
+      contextTokens: 200_000,
+    });
 
     expect(result.updated).toBe(true);
-    expectRuntimeModelFieldsCleared(entry, before);
-    expect(entry.contextTokens).toBeUndefined();
+    expect(entry.providerOverride).toBe("openai");
+    expect(entry.modelOverride).toBe("gpt-5.2");
+    expect(entry.modelProvider).toBeUndefined();
+    expect(entry.model).toBeUndefined();
+    expect(entry.totalTokens).toBeUndefined();
+    expect(entry.totalTokensFresh).toBeUndefined();
+    expect(entry.contextTokens).toBe(200_000);
+    expect((entry.updatedAt ?? 0) > before).toBe(true);
   });
 
   it("retains aligned runtime model fields when selection and runtime already match", () => {
@@ -74,7 +114,6 @@ describe("applyModelOverrideToSessionEntry", () => {
       model: "gpt-5.2",
       providerOverride: "openai",
       modelOverride: "gpt-5.2",
-      contextTokens: 200_000,
     };
 
     const result = applyModelOverrideToSessionEntry({
@@ -88,33 +127,34 @@ describe("applyModelOverrideToSessionEntry", () => {
     expect(result.updated).toBe(false);
     expect(entry.modelProvider).toBe("openai");
     expect(entry.model).toBe("gpt-5.2");
-    expect(entry.contextTokens).toBe(200_000);
     expect(entry.updatedAt).toBe(before);
   });
 
-  it("clears stale contextTokens when switching back to the default model", () => {
+  it("refreshes the stored context window when the same model is re-applied", () => {
     const before = Date.now() - 5_000;
     const entry: SessionEntry = {
       sessionId: "sess-4",
       updatedAt: before,
-      providerOverride: "local",
-      modelOverride: "sunapi386/llama-3-lexi-uncensored:8b",
-      contextTokens: 4_096,
+      providerOverride: "openai",
+      modelOverride: "gpt-5.2",
+      contextTokens: 1_048_576,
+      totalTokens: 10,
+      totalTokensFresh: true,
     };
 
     const result = applyModelOverrideToSessionEntry({
       entry,
       selection: {
-        provider: "local",
-        model: "llama3.1:8b",
-        isDefault: true,
+        provider: "openai",
+        model: "gpt-5.2",
       },
+      contextTokens: 200_000,
     });
 
     expect(result.updated).toBe(true);
-    expect(entry.providerOverride).toBeUndefined();
-    expect(entry.modelOverride).toBeUndefined();
-    expect(entry.contextTokens).toBeUndefined();
+    expect(entry.contextTokens).toBe(200_000);
+    expect(entry.totalTokens).toBeUndefined();
+    expect(entry.totalTokensFresh).toBeUndefined();
     expect((entry.updatedAt ?? 0) > before).toBe(true);
   });
 });

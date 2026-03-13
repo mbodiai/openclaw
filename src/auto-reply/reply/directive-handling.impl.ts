@@ -4,6 +4,7 @@ import {
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
 import { resolveFastModeState } from "../../agents/fast-mode.js";
+import { resolveSessionContextTokensForModel } from "../../agents/context.js";
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
@@ -367,6 +368,11 @@ export async function handleDirectiveOnly(
       entry: sessionEntry,
       selection: modelSelection,
       profileOverride,
+      contextTokens: resolveSessionContextTokensForModel({
+        cfg: params.cfg,
+        provider: modelSelection.provider,
+        model: modelSelection.model,
+      }),
     });
   }
   if (directives.hasQueueDirective && directives.queueReset) {
