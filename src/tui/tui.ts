@@ -561,6 +561,8 @@ export async function runTui(opts: TuiOptions) {
     return { data: next };
   });
   const header = new Text("", 1, 0);
+  const queueContainer = new Container();
+
   const statusContainer = new Container();
   const footer = new Text("", 1, 0);
   const chatLog = new ChatLog();
@@ -572,6 +574,8 @@ export async function runTui(opts: TuiOptions) {
   const root = new Container();
   root.addChild(header);
   root.addChild(chatLog);
+  root.addChild(queueContainer);
+
   root.addChild(statusContainer);
   root.addChild(footer);
   root.addChild(editor);
@@ -940,7 +944,6 @@ export async function runTui(opts: TuiOptions) {
   const {
     handleCommand,
     popQueue,
-
     sendMessage,
     flushQueuedMessage,
     clearQueue,
@@ -950,6 +953,7 @@ export async function runTui(opts: TuiOptions) {
   } = createCommandHandlers({
     client,
     chatLog,
+    queueContainer,
     tui,
     opts,
     state,
