@@ -329,7 +329,12 @@ export function resolveCtrlCAction(params: {
   };
 }
 
+import { ResourceMonitor } from "./resource-monitor.js";
+
 export async function runTui(opts: TuiOptions) {
+  const resourceMonitor = new ResourceMonitor();
+  resourceMonitor.start(5000);
+
   const config = loadConfig();
   const initialSessionInput = (opts.session ?? "").trim();
   let sessionScope: SessionScope = (config.session?.scope ?? "per-sender") as SessionScope;
