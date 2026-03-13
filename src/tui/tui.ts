@@ -31,6 +31,7 @@ import { createEventHandlers } from "./tui-event-handlers.js";
 import { formatTokens } from "./tui-formatters.js";
 import { createLocalShellRunner } from "./tui-local-shell.js";
 import { createOverlayHandlers } from "./tui-overlays.js";
+import { TuiPromptHistory } from "./tui-prompt-history.js";
 import { createSessionActions } from "./tui-session-actions.js";
 import type {
   AgentSummary,
@@ -47,8 +48,11 @@ export type { TuiOptions } from "./tui-types.js";
 export function createEditorSubmitHandler(params: {
   editor: {
     setText: (value: string) => void;
-    addToHistory: (value: string) => void;
   };
+  promptHistory: {
+    noteSubmitted: (sessionKey: string, text: string) => void;
+  };
+  getSessionKey: () => string;
   handleCommand: (value: string) => Promise<void> | void;
   sendMessage: (value: string) => Promise<void> | void;
   handleBangLine: (value: string) => Promise<void> | void;
@@ -63,17 +67,18 @@ export function createEditorSubmitHandler(params: {
       return;
     }
 
+    const sessionKey = params.getSessionKey();
+
     // Bash mode: only if the very first character is '!' and it's not just '!'.
     // IMPORTANT: use the raw (untrimmed) text so leading spaces do NOT trigger.
     // Per requirement: a lone '!' should be treated as a normal message.
     if (raw.startsWith("!") && raw !== "!") {
-      params.editor.addToHistory(raw);
+      params.promptHistory.noteSubmitted(sessionKey, raw);
       void params.handleBangLine(raw);
       return;
     }
 
-    // Enable built-in editor prompt history navigation (up/down).
-    params.editor.addToHistory(value);
+    params.promptHistory.noteSubmitted(sessionKey, value);
 
     if (value.startsWith("/")) {
       void params.handleCommand(value);
@@ -357,6 +362,7 @@ export async function runTui(opts: TuiOptions) {
   let lastCtrlCAt = 0;
   let exitRequested = false;
   let activityStatus = "idle";
+  let inputHint: string | null = null;
   let connectionStatus = "connecting";
   let liveThinkingPreview = "";
   let activeToolName = "";
@@ -527,7 +533,11 @@ export async function runTui(opts: TuiOptions) {
   const statusContainer = new Container();
   const footer = new Text("", 1, 0);
   const chatLog = new ChatLog();
-  const editor = new CustomEditor(tui, editorTheme);
+  const promptHistory = new TuiPromptHistory();
+  const editor = new CustomEditor(tui, editorTheme, {
+    promptHistory,
+    getSessionKey: () => state.currentSessionKey,
+  });
   const root = new Container();
   root.addChild(header);
   root.addChild(chatLog);
@@ -771,8 +781,8 @@ export async function runTui(opts: TuiOptions) {
       statusLoader?.stop();
       statusLoader = null;
       ensureStatusText();
-      const text = activityStatus ? `${connectionStatus} | ${activityStatus}` : connectionStatus;
-      statusText?.setText(theme.dim(text));
+      const parts = [connectionStatus, activityStatus, inputHint].filter(Boolean);
+      statusText?.setText(theme.dim(parts.join(" | ")));
     }
     lastActivityStatus = activityStatus;
   };
@@ -793,6 +803,11 @@ export async function runTui(opts: TuiOptions) {
 
   const setActivityStatus = (text: string) => {
     activityStatus = text;
+    renderStatus();
+  };
+
+  const setInputHint = (text: string | null) => {
+    inputHint = text;
     renderStatus();
   };
 
@@ -856,6 +871,9 @@ export async function runTui(opts: TuiOptions) {
     updateAutocompleteProvider,
     setActivityStatus,
     clearLocalRunIds,
+    onPromptHistorySeed: (sessionKey, texts) => {
+      promptHistory.seedFromTranscript(sessionKey, texts, { maxSeed: 50 });
+    },
     onHistoryLoaded: () => {
       drainPendingAgentEventsFn?.();
     },
@@ -939,6 +957,8 @@ export async function runTui(opts: TuiOptions) {
   updateAutocompleteProvider();
   const submitHandler = createEditorSubmitHandler({
     editor,
+    promptHistory,
+    getSessionKey: () => state.currentSessionKey,
     handleCommand,
     sendMessage,
     handleBangLine: runLocalShellLine,
@@ -947,6 +967,30 @@ export async function runTui(opts: TuiOptions) {
     submit: submitHandler,
     enabled: shouldEnableWindowsGitBashPasteFallback(),
   });
+
+  editor.onChange = (text) => {
+    const value = text;
+    if (!value || value.includes("\n")) {
+      setInputHint(null);
+      return;
+    }
+    if (value.startsWith("!") || value.trimStart().startsWith("/")) {
+      setInputHint(null);
+      return;
+    }
+    if (/(?:^|\s)@[^\s]*$/.test(value)) {
+      setInputHint(null);
+      return;
+    }
+
+    const remainder = promptHistory.getAutosuggestRemainder(state.currentSessionKey, value);
+    if (!remainder) {
+      setInputHint(null);
+      return;
+    }
+    const shown = remainder.length > 80 ? `${remainder.slice(0, 79)}…` : remainder;
+    setInputHint(`tab: ${shown}`);
+  };
 
   editor.onEscape = () => {
     void abortActive();
@@ -967,6 +1011,8 @@ export async function runTui(opts: TuiOptions) {
     });
     lastCtrlCAt = decision.nextLastCtrlCAt;
     if (decision.action === "clear") {
+      const cleared = editor.getText();
+      promptHistory.noteClearedBuffer(state.currentSessionKey, cleared);
       editor.setText("");
       setActivityStatus("cleared input; press ctrl+c again to exit");
       tui.requestRender();

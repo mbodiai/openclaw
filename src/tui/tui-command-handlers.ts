@@ -447,6 +447,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`reasoning set to ${normalized}`);
           applySessionInfoFromPatch(result);
+          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`reasoning failed: ${String(err)}`);
         }

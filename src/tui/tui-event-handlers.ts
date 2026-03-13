@@ -235,7 +235,7 @@ export function createEventHandlers(context: EventHandlerContext) {
       state.activeChatRunId = evt.runId;
     }
     if (evt.state === "delta") {
-      const displayText = streamAssembler.ingestDelta(evt.runId, evt.message, state.showThinking);
+      const displayText = streamAssembler.ingestDelta(evt.runId, evt.message, true);
       if (!displayText) {
         return;
       }
@@ -245,6 +245,7 @@ export function createEventHandlers(context: EventHandlerContext) {
     }
     if (evt.state === "final") {
       const wasActiveRun = state.activeChatRunId === evt.runId;
+      const isLocalRun = isLocalRunId?.(evt.runId) ?? false;
       if (!evt.message) {
         maybeRefreshHistoryForRun(evt.runId, {
           allowLocalWithoutDisplayableFinal: true,
@@ -256,6 +257,9 @@ export function createEventHandlers(context: EventHandlerContext) {
       }
       if (isCommandMessage(evt.message)) {
         maybeRefreshHistoryForRun(evt.runId);
+        if (isLocalRun) {
+          forgetLocalRunId?.(evt.runId);
+        }
         const text = extractTextFromMessage(evt.message);
         if (text) {
           chatLog.addSystem(text);
@@ -287,7 +291,10 @@ export function createEventHandlers(context: EventHandlerContext) {
         chatLog.finalizeAssistant(finalText, evt.runId);
       }
       if (isLocalRun && isNoOutputAssistantText(finalText) && stopReason !== "error") {
-        scheduleNoOutputHistoryFallback(evt.runId, evt.sessionKey);
+        void loadHistory?.();
+      }
+      if (isLocalRun) {
+        forgetLocalRunId?.(evt.runId);
       }
       finalizeRun({
         runId: evt.runId,

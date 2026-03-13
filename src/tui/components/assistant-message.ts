@@ -89,12 +89,12 @@ export class AssistantMessageComponent extends Container {
 
   setText(text: string) {
     // Save raw text to allow toggling thinking visibility without re-fetching
-    (this as any)._rawText = text;
+    (this as { _rawText?: string })._rawText = text;
     this.refresh();
   }
 
   refresh() {
-    const text = (this as any)._rawText || "";
+    const text = (this as { _rawText?: string })._rawText || "";
     const { thinking, content } = splitThinkingPrefix(text);
     if (thinking && thinkingVisible) {
       const normalized = normalizeThinkingForUi(thinking);
