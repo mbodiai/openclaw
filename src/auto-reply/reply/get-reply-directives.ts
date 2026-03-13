@@ -343,9 +343,7 @@ export async function resolveReplyDirectives(params: {
   });
   const defaultActivation = defaultGroupActivation(requireMention);
   const resolvedThinkLevel =
-    directives.thinkLevel ??
-    (sessionEntry?.thinkingLevel as ThinkLevel | undefined) ??
-    (agentCfg?.thinkingDefault as ThinkLevel | undefined);
+    directives.thinkLevel ?? (sessionEntry?.thinkingLevel as ThinkLevel | undefined);
   const resolvedFastMode =
     directives.fastMode ??
     resolveFastModeState({
@@ -362,7 +360,6 @@ export async function resolveReplyDirectives(params: {
   let resolvedReasoningLevel: ReasoningLevel =
     directives.reasoningLevel ??
     (sessionEntry?.reasoningLevel as ReasoningLevel | undefined) ??
-    (agentCfg?.reasoningDefault as ReasoningLevel | undefined) ??
     "off";
   const resolvedElevatedLevel = elevatedAllowed
     ? (directives.elevatedLevel ??
@@ -423,7 +420,6 @@ export async function resolveReplyDirectives(params: {
 
   let contextTokens = resolveContextTokens({
     agentCfg,
-    provider,
     model,
   });
 

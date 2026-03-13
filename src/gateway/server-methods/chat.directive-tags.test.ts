@@ -124,7 +124,6 @@ function createChatContext(): Pick<
   | "chatRunBuffers"
   | "chatDeltaSentAt"
   | "chatAbortedRuns"
-  | "addChatRun"
   | "removeChatRun"
   | "dedupe"
   | "registerToolEventRecipient"
@@ -138,7 +137,6 @@ function createChatContext(): Pick<
     chatRunBuffers: new Map(),
     chatDeltaSentAt: new Map(),
     chatAbortedRuns: new Map(),
-    addChatRun: vi.fn(),
     removeChatRun: vi.fn(),
     dedupe: new Map(),
     registerToolEventRecipient: vi.fn(),
@@ -261,28 +259,6 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     expect(register).toHaveBeenCalledWith("run-current", "conn-1");
     expect(register).toHaveBeenCalledWith("run-same-session", "conn-1");
     expect(register).not.toHaveBeenCalledWith("run-other-session", "conn-1");
-  });
-
-  it("maps agent run ids back to the chat client run id", async () => {
-    createTranscriptFixture("openclaw-chat-send-run-map-");
-    mockState.finalText = "ok";
-    mockState.triggerAgentRunStart = true;
-    mockState.agentRunId = "run-mapped";
-    const respond = vi.fn();
-    const context = createChatContext();
-
-    await runNonStreamingChatSend({
-      context,
-      respond,
-      idempotencyKey: "idem-run-map",
-      expectBroadcast: false,
-    });
-
-    const addChatRun = context.addChatRun as unknown as ReturnType<typeof vi.fn>;
-    expect(addChatRun).toHaveBeenCalledWith("run-mapped", {
-      sessionKey: "main",
-      clientRunId: "idem-run-map",
-    });
   });
 
   it("does not register tool-event recipients without tool-events capability", async () => {

@@ -63,7 +63,6 @@ export type FollowupRun = {
     skillsSnapshot?: SkillSnapshot;
     provider: string;
     model: string;
-    hasSessionModelOverride?: boolean;
     authProfileId?: string;
     authProfileIdSource?: "auto" | "user";
     thinkLevel?: ThinkLevel;

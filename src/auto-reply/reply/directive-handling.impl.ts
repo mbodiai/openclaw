@@ -4,13 +4,12 @@ import {
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
 import { resolveFastModeState } from "../../agents/fast-mode.js";
-import { resolveSessionContextTokensForModel } from "../../agents/context.js";
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
 import type { ExecAsk, ExecHost, ExecSecurity } from "../../infra/exec-approvals.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
-import { applyVerboseOverride, markExplicitLevel } from "../../sessions/level-overrides.js";
+import { applyVerboseOverride } from "../../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
 import { formatThinkingLevels, formatXHighModelHint, supportsXHighThinking } from "../thinking.js";
 import type { ReplyPayload } from "../types.js";
@@ -318,7 +317,6 @@ export async function handleDirectiveOnly(
     directives.hasReasoningDirective && directives.reasoningLevel !== undefined;
   if (directives.hasThinkDirective && directives.thinkLevel) {
     sessionEntry.thinkingLevel = directives.thinkLevel;
-    markExplicitLevel(sessionEntry, "thinking", true);
   }
   if (directives.hasFastDirective && directives.fastMode !== undefined) {
     sessionEntry.fastMode = directives.fastMode;
@@ -336,7 +334,6 @@ export async function handleDirectiveOnly(
     } else {
       sessionEntry.reasoningLevel = directives.reasoningLevel;
     }
-    markExplicitLevel(sessionEntry, "reasoning", true);
     reasoningChanged =
       directives.reasoningLevel !== prevReasoningLevel && directives.reasoningLevel !== undefined;
   }
@@ -344,7 +341,6 @@ export async function handleDirectiveOnly(
     // Unlike other toggles, elevated defaults can be "on".
     // Persist "off" explicitly so `/elevated off` actually overrides defaults.
     sessionEntry.elevatedLevel = directives.elevatedLevel;
-    markExplicitLevel(sessionEntry, "elevated", true);
     elevatedChanged =
       elevatedChanged ||
       (directives.elevatedLevel !== prevElevatedLevel && directives.elevatedLevel !== undefined);
@@ -368,11 +364,6 @@ export async function handleDirectiveOnly(
       entry: sessionEntry,
       selection: modelSelection,
       profileOverride,
-      contextTokens: resolveSessionContextTokensForModel({
-        cfg: params.cfg,
-        provider: modelSelection.provider,
-        model: modelSelection.model,
-      }),
     });
   }
   if (directives.hasQueueDirective && directives.queueReset) {

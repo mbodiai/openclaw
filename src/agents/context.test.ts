@@ -4,7 +4,6 @@ import {
   applyConfiguredContextWindows,
   applyDiscoveredContextWindows,
   resolveContextTokensForModel,
-  resolveSessionContextTokensForModel,
 } from "./context.js";
 import { createSessionManagerRuntimeRegistry } from "./pi-extensions/session-manager-runtime-registry.js";
 
@@ -192,33 +191,5 @@ describe("resolveContextTokensForModel", () => {
     });
 
     expect(result).toBe(200_000);
-  });
-});
-
-describe("resolveSessionContextTokensForModel", () => {
-  it("uses the configured session cap when present", () => {
-    const result = resolveSessionContextTokensForModel({
-      cfg: {
-        agents: {
-          defaults: {
-            contextTokens: 123_456,
-          },
-        },
-      },
-      provider: "openai",
-      model: "gpt-5.2",
-      fallbackContextTokens: 200_000,
-    });
-
-    expect(result).toBe(123_456);
-  });
-
-  it("falls back to the default context window when the model is unknown", () => {
-    const result = resolveSessionContextTokensForModel({
-      provider: "custom",
-      model: "missing-model",
-    });
-
-    expect(result).toBeGreaterThan(0);
   });
 });

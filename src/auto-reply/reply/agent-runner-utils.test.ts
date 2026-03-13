@@ -3,18 +3,12 @@ import type { FollowupRun } from "./queue.js";
 
 const hoisted = vi.hoisted(() => {
   const resolveRunModelFallbacksOverrideMock = vi.fn();
-  const resolveEffectiveModelFallbacksMock = vi.fn();
-  return {
-    resolveRunModelFallbacksOverrideMock,
-    resolveEffectiveModelFallbacksMock,
-  };
+  return { resolveRunModelFallbacksOverrideMock };
 });
 
 vi.mock("../../agents/agent-scope.js", () => ({
   resolveRunModelFallbacksOverride: (...args: unknown[]) =>
     hoisted.resolveRunModelFallbacksOverrideMock(...args),
-  resolveEffectiveModelFallbacks: (...args: unknown[]) =>
-    hoisted.resolveEffectiveModelFallbacksMock(...args),
 }));
 
 const {
@@ -52,7 +46,6 @@ function makeRun(overrides: Partial<FollowupRun["run"]> = {}): FollowupRun["run"
 describe("agent-runner-utils", () => {
   beforeEach(() => {
     hoisted.resolveRunModelFallbacksOverrideMock.mockClear();
-    hoisted.resolveEffectiveModelFallbacksMock.mockClear();
   });
 
   it("resolves model fallback options from run context", () => {
@@ -87,21 +80,6 @@ describe("agent-runner-utils", () => {
       sessionKey: run.sessionKey,
     });
     expect(resolved.fallbacksOverride).toEqual(["fallback-model"]);
-  });
-
-  it("keeps default fallbacks available when the session pins a model override", () => {
-    hoisted.resolveEffectiveModelFallbacksMock.mockReturnValue(["anthropic/claude-opus-4-6"]);
-    const run = makeRun({ hasSessionModelOverride: true });
-
-    const resolved = resolveModelFallbackOptions(run);
-
-    expect(hoisted.resolveEffectiveModelFallbacksMock).toHaveBeenCalledWith({
-      cfg: run.config,
-      agentId: run.agentId,
-      hasSessionModelOverride: true,
-    });
-    expect(hoisted.resolveRunModelFallbacksOverrideMock).not.toHaveBeenCalled();
-    expect(resolved.fallbacksOverride).toEqual(["anthropic/claude-opus-4-6"]);
   });
 
   it("builds embedded run base params with auth profile and run metadata", () => {

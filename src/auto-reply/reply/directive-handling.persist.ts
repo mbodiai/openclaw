@@ -3,7 +3,8 @@ import {
   resolveDefaultAgentId,
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
-import { resolveSessionContextTokensForModel } from "../../agents/context.js";
+import { lookupContextTokens } from "../../agents/context.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import {
   buildModelAliasIndex,
   type ModelAliasIndex,
@@ -64,13 +65,6 @@ export async function persistInlineDirectives(params: {
     ? resolveSessionAgentId({ sessionKey, config: cfg })
     : resolveDefaultAgentId(cfg);
   const agentDir = resolveAgentDir(cfg, activeAgentId);
-  const resolveSessionContextTokens = (providerValue: string, modelValue: string) =>
-    resolveSessionContextTokensForModel({
-      cfg,
-      provider: providerValue,
-      model: modelValue,
-      contextTokensOverride: agentCfg?.contextTokens,
-    });
 
   if (sessionEntry && sessionStore && sessionKey) {
     const prevElevatedLevel =
@@ -168,10 +162,6 @@ export async function persistInlineDirectives(params: {
           }
           const isDefault =
             resolved.ref.provider === defaultProvider && resolved.ref.model === defaultModel;
-          const contextTokens = resolveSessionContextTokens(
-            resolved.ref.provider,
-            resolved.ref.model,
-          );
           const { updated: modelUpdated } = applyModelOverrideToSessionEntry({
             entry: sessionEntry,
             selection: {
@@ -180,7 +170,6 @@ export async function persistInlineDirectives(params: {
               isDefault,
             },
             profileOverride,
-            contextTokens,
           });
           provider = resolved.ref.provider;
           model = resolved.ref.model;
@@ -224,7 +213,7 @@ export async function persistInlineDirectives(params: {
   return {
     provider,
     model,
-    contextTokens: resolveSessionContextTokens(provider, model),
+    contextTokens: agentCfg?.contextTokens ?? lookupContextTokens(model) ?? DEFAULT_CONTEXT_TOKENS,
   };
 }
 
