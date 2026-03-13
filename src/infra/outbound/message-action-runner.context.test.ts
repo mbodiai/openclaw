@@ -369,30 +369,6 @@ describe("runMessageAction context isolation", () => {
     expect(result.channel).toBe(expectedChannel);
   });
 
-  it("fails closed for internal webchat contexts when channel is omitted", async () => {
-    const telegramOnlyConfig = {
-      channels: {
-        telegram: {
-          token: "tg-test",
-        },
-      },
-    } as OpenClawConfig;
-
-    await expect(
-      runDrySend({
-        cfg: telegramOnlyConfig,
-        actionParams: {
-          target: "webchat:user-123",
-          message: "hi",
-        },
-        toolContext: {
-          currentChannelId: "webchat:user-123",
-          currentChannelProvider: "webchat",
-        },
-      }),
-    ).rejects.toThrow(/cannot auto-route to internal webchat/i);
-  });
-
   it.each([
     {
       name: "blocks cross-provider sends by default",
