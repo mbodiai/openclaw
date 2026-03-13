@@ -135,6 +135,8 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`model set to ${value}`);
           applySessionInfoFromPatch(result);
+
+          await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`model set failed: ${String(err)}`);
         }
@@ -400,6 +402,8 @@ export function createCommandHandlers(context: CommandHandlerContext) {
             });
             chatLog.addSystem(`model set to ${args}`);
             applySessionInfoFromPatch(result);
+
+            await refreshSessionInfo();
           } catch (err) {
             chatLog.addSystem(`model set failed: ${String(err)}`);
           }
@@ -441,7 +445,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`verbose set to ${args}`);
           applySessionInfoFromPatch(result);
-          await loadHistory();
         } catch (err) {
           chatLog.addSystem(`verbose failed: ${String(err)}`);
         }
@@ -484,6 +487,7 @@ export function createCommandHandlers(context: CommandHandlerContext) {
           });
           chatLog.addSystem(`reasoning set to ${normalized}`);
           applySessionInfoFromPatch(result);
+
           await refreshSessionInfo();
         } catch (err) {
           chatLog.addSystem(`reasoning failed: ${String(err)}`);
@@ -575,7 +579,6 @@ export function createCommandHandlers(context: CommandHandlerContext) {
 
           await client.resetSession(state.currentSessionKey, name);
           chatLog.addSystem(`session ${state.currentSessionKey} reset`);
-          await loadHistory();
         } catch (err) {
           chatLog.addSystem(`reset failed: ${sanitizeRenderableText(String(err))}`);
         }
