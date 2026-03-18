@@ -242,7 +242,7 @@ describe("bot-native-command-menu", () => {
     await vi.waitFor(() => expect(deleteMyCommands).toHaveBeenCalledTimes(2));
   });
 
-  it("retries with fewer commands on BOT_COMMANDS_TOO_MUCH", async () => {
+  it("finds the highest acceptable command count after BOT_COMMANDS_TOO_MUCH", async () => {
     const deleteMyCommands = vi.fn(async () => undefined);
     const setMyCommands = vi
       .fn()
@@ -265,18 +265,17 @@ describe("bot-native-command-menu", () => {
     });
 
     await vi.waitFor(() => {
-      expect(setMyCommands).toHaveBeenCalledTimes(2);
+      expect(runtimeLog).toHaveBeenCalledWith(
+        "Telegram accepted 99 commands after BOT_COMMANDS_TOO_MUCH (started with 100; omitted 1). Reduce plugin/skill/custom commands to expose more menu entries.",
+      );
     });
-    const firstPayload = setMyCommands.mock.calls[0]?.[0] as Array<unknown>;
-    const secondPayload = setMyCommands.mock.calls[1]?.[0] as Array<unknown>;
-    expect(firstPayload).toHaveLength(100);
-    expect(secondPayload).toHaveLength(80);
-    expect(runtimeLog).toHaveBeenCalledWith(
-      "Telegram rejected 100 commands (BOT_COMMANDS_TOO_MUCH); retrying with 80.",
+    const payloadLengths = setMyCommands.mock.calls.map(
+      ([payload]) => (payload as Array<unknown>).length,
     );
-    expect(runtimeLog).toHaveBeenCalledWith(
-      "Telegram accepted 80 commands after BOT_COMMANDS_TOO_MUCH (started with 100; omitted 20). Reduce plugin/skill/custom commands to expose more menu entries.",
-    );
+    expect(payloadLengths[0]).toBe(100);
+    expect(payloadLengths.length).toBeGreaterThan(2);
+    expect(payloadLengths.slice(1).some((count) => count < 100)).toBe(true);
+    expect(payloadLengths.at(-1)).toBe(99);
     expect(runtimeError).not.toHaveBeenCalled();
   });
 });
